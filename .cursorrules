@@ -279,10 +279,31 @@ src/
 - Background: Dark theme preferred
 
 ### Typography Scale
-- Headings: font-bold, proper hierarchy (text-3xl, text-2xl, text-xl)
-- Body: font-medium for UI, font-normal for content
-- Code: font-mono for technical elements
-- Proper contrast ratios (4.5:1 minimum)
+- Core Strategy:
+  - Use system fonts for body text (performance-focused)
+  - Use BIZ UDPGothic (web font) for headings only
+  - Web fonts are subset with minimal character sets
+
+- System Font Stack (font-sans):
+  - -apple-system
+  - BlinkMacSystemFont
+  - "Hiragino Kaku Gothic ProN"
+  - "Hiragino Sans"
+  - Meiryo
+  - sans-serif
+
+- Web Font (font-heading):
+  - BIZ UDPGothic (weight: 700 only)
+  - display: swap
+  - preload: true
+  - subset: latin
+
+- Text Styles:
+  - Headings: font-heading font-bold, (text-3xl, text-2xl, text-xl)
+  - Body: font-sans font-normal
+  - UI Elements: font-sans font-medium
+  - Code: font-mono
+  - Proper contrast ratios (4.5:1 minimum)
 
 ### Layout Principles
 - 8px grid system for spacing
