@@ -261,3 +261,132 @@ src/
 - Call completion rates
 - Revenue metrics
 - Creator satisfaction scores
+
+## UI Design Guidelines
+### Design System Reference
+- Inspiration: Vercel, Linear, Stripe, Discord UI patterns
+- Modern, professional, developer-focused aesthetic
+- Glass-morphism and subtle animations
+- Micro-interactions for enhanced UX
+
+### Color System
+- Base: Zinc (shadcn/ui Zinc theme)
+- Primary: Blue-500 (#3B82F6)
+- Secondary: Zinc-500 (#71717A)
+- Success: Green-500 (#10B981)
+- Warning: Yellow-500 (#F59E0B)
+- Error: Red-500 (#EF4444)
+- Background: Dark theme preferred
+
+### Typography Scale
+- Headings: font-bold, proper hierarchy (text-3xl, text-2xl, text-xl)
+- Body: font-medium for UI, font-normal for content
+- Code: font-mono for technical elements
+- Proper contrast ratios (4.5:1 minimum)
+
+### Layout Principles
+- 8px grid system for spacing
+- Mobile-first responsive design
+- Consistent component spacing
+- Card-based information architecture
+- Proper visual hierarchy
+
+### Component Patterns
+#### Navigation
+- Sidebar navigation for dashboard
+- Top navigation for marketing pages
+- Breadcrumbs for deep navigation
+- Mobile-friendly hamburger menus
+
+#### Data Display
+- Cards for grouped information
+- Tables with sorting and filtering
+- Charts for analytics (recharts)
+- Progress indicators for loading
+- Empty states with helpful messaging
+
+#### Forms
+- shadcn/ui form components
+- Proper validation feedback
+- Loading states during submission
+- Error handling with toast notifications
+- Accessibility compliance
+
+#### Interactive Elements
+- Hover effects with smooth transitions
+- Click feedback (button states)
+- Skeleton loading for async content
+- Toast notifications for actions
+- Modal dialogs for confirmations
+
+### Animation Guidelines
+- Subtle transitions (200-300ms)
+- Easing functions: ease-in-out
+- Hover effects on interactive elements
+- Page transitions for route changes
+- Loading animations for async operations
+
+### Responsive Breakpoints
+- Mobile: 320px - 768px
+- Tablet: 768px - 1024px
+- Desktop: 1024px+
+- Test on multiple devices
+
+### Accessibility Standards
+- Semantic HTML elements
+- ARIA labels where needed
+- Keyboard navigation support
+- Screen reader compatibility
+- Color contrast compliance
+- Focus indicators
+
+### Component Library
+#### Required shadcn/ui Components
+- card, button, input, form
+- avatar, badge, progress
+- dialog, sheet, tabs
+- skeleton, toast, dropdown-menu
+- calendar, chart (for advanced features)
+
+#### Custom Components
+- VideoCallInterface (Daily.co integration)
+- CreatorCard (creator listings)
+- CallProductCard (service offerings)
+- PaymentForm (Stripe integration)
+- StatusIndicator (online/offline states)
+
+### Page-Specific Design Patterns
+#### Landing Page
+- Hero section with gradient background
+- Feature grid (3-column)
+- Social proof sections
+- Clear call-to-action buttons
+- Footer with links
+
+#### Dashboard
+- Sidebar navigation
+- Statistics cards grid
+- Data tables with actions
+- Quick action buttons
+- Recent activity feed
+
+#### Video Call Interface
+- Full-screen video area
+- Floating control buttons
+- Collapsible chat sidebar
+- Participant list
+- Screen sharing controls
+
+#### Creator Profile
+- Header with avatar and stats
+- Service offerings grid
+- Reviews and ratings
+- Booking calendar
+- Portfolio showcase
+
+### Implementation Notes
+- Use Tailwind CSS for styling
+- Implement dark mode by default
+- Test on mobile devices frequently
+- Optimize images with Next.js Image
+- Ensure fast loading times (<2s LCP)
