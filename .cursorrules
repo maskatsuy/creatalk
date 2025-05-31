@@ -1,0 +1,256 @@
+# Creatalk
+A full-stack video calling platform for creators and fans.
+
+## Features
+- Real-time video calls with Daily.co
+- Secure payment processing with Stripe
+- Advanced scheduling system
+- Creator dashboard and analytics
+
+## Tech Stack
+- Next.js 15 (App Router) with Turbopack
+- TypeScript (strict mode)
+- Tailwind CSS + shadcn/ui (Zinc color scheme)
+- ESLint + Prettier configuration
+- Supabase (Auth, Database, Realtime, RLS)
+- Daily.co (Video calling API with recording)
+- Stripe (Test mode payments - one-time purchases)
+
+## Directory Structure
+```
+src/
+├── app/                 # App Router pages
+│   ├── (auth)/         # Auth route group
+│   │   └── login/      # Login page
+│   ├── dashboard/      # User dashboard
+│   ├── creators/       # Creator listing & profiles
+│   │   └── [id]/       # Creator detail pages
+│   ├── creator/        # Creator management
+│   │   ├── apply/      # Creator registration
+│   │   ├── products/   # Product management
+│   │   ├── schedule/   # Schedule management
+│   │   └── earnings/   # Revenue dashboard
+│   ├── call/           # Video call pages
+│   │   └── [roomId]/   # Video call interface
+│   ├── profile/        # Profile settings
+│   └── api/            # API routes (minimal)
+│       └── auth/       # OAuth callbacks only
+├── components/         # React components
+│   ├── ui/            # shadcn/ui components
+│   ├── auth/          # Auth-related components
+│   ├── call/          # Call-related components
+│   ├── creator/       # Creator-specific components
+│   └── layout/        # Layout components
+├── actions/           # Server Actions
+│   ├── auth.ts        # Authentication actions
+│   ├── creator.ts     # Creator actions
+│   ├── call.ts        # Call management actions
+│   └── payment.ts     # Payment actions
+├── lib/              # Utilities and configurations
+│   ├── supabase.ts   # Supabase client
+│   ├── daily.ts      # Daily.co client
+│   ├── stripe.ts     # Stripe configuration
+│   └── utils.ts      # General utilities
+├── types/            # TypeScript type definitions
+│   ├── database.ts   # Supabase database types
+│   ├── auth.ts       # Auth types
+│   └── call.ts       # Call-related types
+└── hooks/            # Custom React hooks
+├── useAuth.ts    # Authentication hook
+└── useCall.ts    # Call management hook
+```
+
+## Code Style
+- Use src/ directory structure
+- Import alias: @/* → src/*
+- Use Server Actions over API routes
+- TypeScript strict mode
+- ESLint + Prettier for code formatting
+- Component names: PascalCase
+- File names: kebab-case
+- Always include proper error handling
+- Use revalidatePath() for cache updates
+- Use "use server" directive for server functions
+- Form handling with Server Actions
+
+## Business Logic
+### Call Products (2 patterns)
+1. Queue System: 21:00-22:00 time slots with breaks
+2. Fixed Slots: 21:00-21:05, 21:08-21:13 specific timings
+
+### Features Required
+- Video/Audio ON/OFF control
+- Screen sharing (for real-time illustration feedback)
+- Chat (Creator can speak, Fan chat-only mode)
+- Recording (Creator-configurable, 1-week access/download)
+- Break system for queue management
+- Payment before call (front-payment system)
+- Real-time status updates
+
+## Database Schema
+- profiles (user info, linked to auth.users)
+- creators (creator info, online status, ratings)
+- call_products (type: queue/slot, pricing, recording settings)
+- reservations (queue position, slot times, Daily.co room info)
+
+## Page Structure
+### Auth Pages
+- /login - Email/Password + Google OAuth
+
+### User Common Pages
+- /dashboard - User-specific dashboard
+- /profile - Profile settings
+
+### Fan Pages
+- /creators - Creator list with search/filter
+- /creators/[id] - Creator profile & products
+- /creators/[id]/products/[productId] - Purchase flow
+- /call/[roomId] - Video call interface
+
+### Creator Pages
+- /creator/apply - Creator registration
+- /creator/products - Product management (queue/slot types)
+- /creator/schedule - Schedule management
+- /creator/earnings - Revenue dashboard
+
+## Daily.co Integration
+- Room creation with recording enabled/disabled
+- Participant limits (Creator + 1 Fan)
+- Auto-expiry for fixed slots
+- Recording URL storage and access control
+- Break system for queue management
+
+## Stripe Integration
+- One-time payments for call purchases
+- Test mode with test card numbers
+- Webhook handling for payment confirmation
+
+## UI Patterns
+- Mobile-first responsive design
+- Dark mode support
+- shadcn/ui components as base
+- Consistent loading states
+- Error boundaries
+- Real-time status updates (Supabase Realtime)
+- Toast notifications for user feedback
+
+## Development Environment
+- Use Supabase Cloud (not local)
+- Environment variables for API keys
+- Git version control with meaningful commits
+- ESLint rules for code quality
+
+## Features Priority
+1. Auth system & profiles
+2. Creator listing & basic video calls
+3. Payment integration & call products
+4. Creator management tools & analytics
+
+## API Strategy
+- Daily.co: Video calls, recording, participant management
+- Stripe: One-time payments for call purchases
+- Supabase: All data operations via Server Actions
+- API Routes only for: webhooks, OAuth callbacks
+
+## Error Handling
+- Try-catch blocks in Server Actions
+- User-friendly error messages
+- Loading states for async operations
+- Form validation with proper feedback
+
+## Testing Strategy
+### Unit Testing
+- Vitest for component and utility testing
+- React Testing Library for component interactions
+- Test coverage target: 80%+ for critical paths
+- Mock Supabase and Daily.co in tests
+
+### E2E Testing
+- Playwright for end-to-end testing
+- Critical user flows: auth, call booking, video calls
+- Cross-browser testing (Chrome, Safari, Firefox)
+- Mobile device testing
+
+### Test Structure
+```
+src/
+├── tests/          # Unit tests
+├── components/
+│   └── tests/      # Component tests
+└── e2e/               # E2E tests
+├── auth.spec.ts
+├── booking.spec.ts
+└── call.spec.ts
+```
+
+## Performance Goals
+### Core Web Vitals
+- LCP (Largest Contentful Paint): < 2.5s
+- FID (First Input Delay): < 100ms
+- CLS (Cumulative Layout Shift): < 0.1
+- Lighthouse Performance Score: 90+
+
+### Video Call Quality
+- Connection establishment: < 3s
+- Audio/Video latency: < 150ms
+- Recording quality: 720p minimum
+- Mobile compatibility: iOS Safari, Android Chrome
+
+### Optimization Techniques
+- Next.js Image optimization
+- Code splitting with dynamic imports
+- Supabase connection pooling
+- Daily.co preconnection for faster calls
+
+## Security Guidelines
+### Authentication & Authorization
+- Supabase RLS (Row Level Security) for all tables
+- JWT token validation in middleware
+- Session management with automatic refresh
+- Role-based access control (Fan/Creator/Admin)
+
+### API Security
+- Environment variables for all API keys
+- No sensitive data in client-side code
+- Rate limiting for API endpoints
+- Input validation and sanitization
+
+### Data Protection
+- HTTPS only in production
+- Encrypted data storage (Supabase)
+- PII handling compliance
+- Video call data retention policies
+
+### Security Checklist
+- [ ] No API keys in git repository
+- [ ] All database queries use RLS
+- [ ] Input validation on all forms
+- [ ] CORS properly configured
+- [ ] Security headers implemented
+- [ ] Regular dependency updates
+
+## Code Quality Standards
+### Code Review Criteria
+- TypeScript strict mode compliance
+- ESLint zero warnings
+- Meaningful test coverage
+- Documentation for complex functions
+- Performance impact assessment
+
+### Git Workflow
+- Feature branches for all changes
+- Meaningful commit messages
+- PR reviews before merge
+- Automated testing in CI/CD
+
+## Monitoring & Analytics
+### Error Tracking
+- Sentry for error monitoring
+- User session recordings for UX issues
+- Performance monitoring
+
+### Business Metrics
+- User engagement tracking
+- Call completion rates
+- Revenue metrics
+- Creator satisfaction scores
