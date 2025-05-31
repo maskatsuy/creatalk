@@ -16,6 +16,13 @@ A full-stack video calling platform for creators and fans.
 - Daily.co (Video calling API with recording)
 - Stripe (Test mode payments - one-time purchases)
 
+## Development Strategy
+### Supabase Development
+- Supabase Cloudのみを使用し、ローカル環境は使用しない
+- マイグレーションファイルはバージョン管理し、SQL Editorで実行
+- RLSポリシーは全テーブルに適用
+- Realtime機能を活用した状態同期
+
 ## Directory Structure
 ```
 src/
