@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Creatalk - クリエイターとファンをつなぐビデオ通話プラットフォーム
 
-## Getting Started
+## 概要
+Creatalkは、クリエイターとファンを1対1のビデオ通話でつなぐプラットフォームです。クリエイターとファンの間で、より直接的で価値のある交流を実現します。
 
-First, run the development server:
+## 主な機能
+- リアルタイムビデオ通話（Daily.co）
+- 安全な決済処理（Stripe）
+- 高度な予約システム
+- クリエイターダッシュボード
+- 分析機能
 
+## 技術スタック
+- Next.js 15（App Router）with Turbopack
+- TypeScript（Strict Mode）
+- Tailwind CSS + shadcn/ui（Zinc color scheme）
+- ESLint + Prettier
+- Supabase（認証、データベース、リアルタイム機能、RLS）
+- Daily.co（ビデオ通話API、録画機能）
+- Stripe（テストモード、ワンタイム決済）
+
+## 開発環境のセットアップ
+
+### 必要条件
+- Node.js 18.0.0以上
+- npm
+- Supabaseアカウント
+- Daily.coアカウント
+- Stripeアカウント（テストモード）
+
+### インストール手順
+
+1. リポジトリのクローン
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone [repository-url]
+cd creatalk
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. 依存関係のインストール
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. 環境変数の設定
+```bash
+cp .env.example .env.local
+```
+`.env.local`ファイルを編集し、必要な環境変数を設定してください。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. 開発サーバーの起動
+```bash
+npm run dev
+```
 
-## Learn More
+## Supabaseのセットアップ
 
-To learn more about Next.js, take a look at the following resources:
+### データベース設定
+1. Supabaseプロジェクトの作成
+2. 以下のテーブルを作成：
+   - profiles（ユーザー情報、auth.usersと連携）
+   - creators（クリエイター情報、オンラインステータス、評価）
+   - call_products（通話商品：キュー/スロット、価格、録画設定）
+   - reservations（予約：キュー位置、スロット時間、通話ルーム情報）
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 認証設定
+1. メール認証の有効化
+2. Google OAuth の設定
+3. RLS（Row Level Security）ポリシーの設定
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## アプリケーション構造
+```
+src/
+├── app/                 # Appルーターページ
+│   ├── (auth)/         # 認証関連
+│   ├── dashboard/      # ユーザーダッシュボード
+│   ├── creators/       # クリエイター一覧・詳細
+│   ├── creator/        # クリエイター管理
+│   ├── call/           # ビデオ通話
+│   ├── profile/        # プロフィール設定
+│   └── api/            # APIルート
+├── components/         # Reactコンポーネント
+├── actions/           # サーバーアクション
+├── lib/              # ユーティリティ
+├── types/            # 型定義
+└── hooks/            # カスタムフック
+```
 
-## Deploy on Vercel
+## 通話商品の種類
+1. キューシステム
+   - 21:00-22:00の時間枠
+   - 休憩システムあり
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. 固定スロット
+   - 5分単位の予約（例：21:00-21:05）
+   - 予約可能時間の柔軟な設定
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 開発ガイドライン
+
+### コーディング規約
+- src/ディレクトリ構造を使用
+- インポートエイリアス: @/* → src/*
+- APIルートよりもServer Actionsを優先
+- TypeScript Strict Mode
+- ESLint + Prettierでコード整形
+- コンポーネント名: PascalCase
+- ファイル名: kebab-case
+
+### エラーハンドリング
+- Server Actionsでのtry-catch
+- ユーザーフレンドリーなエラーメッセージ
+- 非同期処理のローディング状態
+- フォームバリデーション
+
+### UIパターン
+- モバイルファーストのレスポンシブデザイン
+- ダークモードサポート
+- shadcn/uiコンポーネント
+- 一貫性のあるローディング状態
+- エラーバウンダリー
+- リアルタイム更新（Supabase Realtime）
+- トースト通知
+
+## デプロイ
+- Vercelを推奨
+- 本番環境の環境変数設定
+- Supabase本番プロジェクトの設定
+- Stripeの本番モード設定
+
+## ライセンス
+[ライセンス情報を記載]
