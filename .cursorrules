@@ -453,15 +453,111 @@ export async function middleware(request: NextRequest) {
 - Synchronous access to request data
 
 ### Authentication Patterns
+### Server Components
+- Use cookies() with await for auth checks
+- createServerClient for server-side Supabase operations
+- Redirect on auth failure
+- SEO-friendly, fast initial load
+
+### Client Components  
+- AuthProvider for global auth state
+- useAuth hook for component auth state
+- Real-time auth state updates
+- Interactive auth operations
+
+### Hybrid Approach (Recommended)
+- Server: Initial auth check + data fetching
+- Client: Auth state management + interactions
+- AuthProvider with server-provided initial state
+- Server Actions for auth operations
+
+### File Structure
+```
+lib/
+├── auth.ts              # Server-side auth utilities
+├── supabase-client.ts   # Client-side Supabase
+└── supabase-server.ts   # Server-side Supabase
+providers/
+└── auth-provider.tsx    # Client auth context
+middleware.ts            # Route protection
+```
+
+### Usage Patterns
+- Protected pages: Use requireAuth() in Server Components
+- Auth-dependent UI: Use useAuth() in Client Components  
+- Auth operations: Server Actions with supabase-server
+- Real-time updates: Client Components with auth provider
+
+### Example Implementations
+
+#### Server Component Auth Check
 ```typescript
-// Supabase Auth with Next.js 15
-async function getUser() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      get: (name) => cookieStore.get(name)?.value,
-    },
-  })
-  return await supabase.auth.getUser()
+// app/protected/page.tsx
+import { requireAuth } from '@/lib/auth'
+
+export default async function ProtectedPage() {
+  await requireAuth()
+  // Protected content...
 }
 ```
+
+#### Client Component with Auth
+```typescript
+// components/UserProfile.tsx
+'use client'
+import { useAuth } from '@/hooks/useAuth'
+
+export function UserProfile() {
+  const { user, loading } = useAuth()
+  if (loading) return <div>Loading...</div>
+  if (!user) return <div>Please login</div>
+  return <div>Welcome {user.email}</div>
+}
+```
+
+#### Server Action Auth
+```typescript
+// actions/auth.ts
+'use server'
+import { createServerClient } from '@/lib/supabase-server'
+
+export async function serverAuthAction() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
+  // Auth operations...
+}
+```
+
+#### Auth Provider Setup
+```typescript
+// providers/auth-provider.tsx
+'use client'
+import { createContext, useContext } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+
+const AuthContext = createContext(null)
+
+export function AuthProvider({ children, initialUser }) {
+  const auth = useAuth(initialUser)
+  return (
+    <AuthContext.Provider value={auth}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+```
+
+### Common Patterns to Avoid
+- Using cookies() without await
+- Mixing client/server auth methods
+- Duplicating auth logic across components
+- Storing sensitive auth data in localStorage
+- Not handling loading/error states
+
+### Best Practices
+- Always use TypeScript for auth-related code
+- Implement proper error boundaries
+- Use loading states during auth operations
+- Keep auth logic centralized
+- Regular security audits of auth code
+- Proper error handling for auth failures

@@ -1,13 +1,10 @@
 import { createServerClient as createClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import type { Database } from '@/types/database'
 
-export type CookieStore = {
-  get(name: string): { value: string } | undefined
-  set(options: { name: string; value: string } & CookieOptions): void
-  delete(options: { name: string } & CookieOptions): void
-}
+export async function createServerClient<T extends Database = Database>() {
+  const cookieStore = await cookies()
 
-export function createServerClientWithCookies<T extends Database = Database>(cookieStore: CookieStore) {
   return createClient<T>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

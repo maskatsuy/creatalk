@@ -143,6 +143,46 @@ export interface Database {
           updated_at?: string
         }
       }
+      user_roles: {
+        Row: {
+          user_id: string
+          role_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          role_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          role_id?: string
+          created_at?: string
+        }
+      }
+      creator_applications: {
+        Row: {
+          id: string
+          user_id: string
+          status: 'pending' | 'approved' | 'rejected'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          status?: 'pending' | 'approved' | 'rejected'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

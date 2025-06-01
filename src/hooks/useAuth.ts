@@ -1,41 +1,49 @@
 import { useCallback, useEffect, useState } from 'react'
 import { User, AuthChangeEvent, Session, AuthError } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase-client'
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import type { Database } from '@/types/database'
 
-export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+export const useAuth = (initialUser: User | null = null) => {
+  const [user, setUser] = useState<User | null>(initialUser)
+  const [loading, setLoading] = useState(!initialUser)
   const router = useRouter()
+  
+  const supabase = createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
-      } catch (error: unknown) {
-        if (error instanceof AuthError) {
-          console.error('Error loading user:', error.message)
-          toast.error('ユーザー情報の取得に失敗しました')
+    if (!initialUser) {
+      const getUser = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          setUser(user)
+        } catch (error: unknown) {
+          if (error instanceof AuthError) {
+            console.error('Error loading user:', error.message)
+            toast.error('ユーザー情報の取得に失敗しました')
+          }
+        } finally {
+          setLoading(false)
         }
-      } finally {
-        setLoading(false)
       }
+      getUser()
     }
 
-    getUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null)
+      // if (session?.user) {
+      //   router.refresh()
+      // }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase.auth, router, initialUser])
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
@@ -45,6 +53,7 @@ export const useAuth = () => {
       })
       if (error) throw error
       toast.success('ログインしました')
+      router.refresh() // ここはログイン成功時なので残しても良いかもしれない
     } catch (error: unknown) {
       if (error instanceof AuthError) {
         console.error('Error signing in:', error.message)
@@ -52,7 +61,7 @@ export const useAuth = () => {
         throw error
       }
     }
-  }, [])
+  }, [supabase.auth, router])
 
   const signUp = useCallback(async (email: string, password: string) => {
     try {
@@ -72,7 +81,7 @@ export const useAuth = () => {
         throw error
       }
     }
-  }, [])
+  }, [supabase.auth])
 
   const signOut = useCallback(async () => {
     try {
@@ -80,13 +89,14 @@ export const useAuth = () => {
       if (error) throw error
       toast.success('ログアウトしました')
       router.push('/login')
+      // router.refresh() // ログアウト後はページ遷移するので不要かもしれない
     } catch (error: unknown) {
       if (error instanceof AuthError) {
         console.error('Error signing out:', error.message)
         toast.error('ログアウトに失敗しました')
       }
     }
-  }, [router])
+  }, [supabase.auth, router])
 
   return {
     user,

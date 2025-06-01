@@ -1,10 +1,10 @@
 'use client'
 
-import { supabase } from '@/lib/supabase-client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { AuthError } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { useAuthContext } from '@/components/auth/AuthProvider'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -14,6 +14,7 @@ export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectPath = searchParams.get('redirect') || '/'
+  const { signIn } = useAuthContext()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -21,14 +22,7 @@ export default function LoginForm() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      // ログイン成功後、リダイレクト先に遷移
+      await signIn(email, password)
       router.push(redirectPath)
     } catch (error: unknown) {
       if (error instanceof AuthError) {

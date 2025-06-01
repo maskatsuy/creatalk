@@ -7,16 +7,14 @@ const publicPaths = ['/login', '/signup', '/auth/callback']
 const apiPaths = ['/api']
 
 export async function middleware(request: NextRequest) {
+  console.log('[Middleware] Path:', request.nextUrl.pathname)
   // APIパスはスキップ
   if (apiPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
+    console.log('[Middleware] Skipping API path')
     return NextResponse.next()
   }
 
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  const response = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,9 +45,14 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user }, error } = await supabase.auth.getUser()
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname === path)
+  
+  console.log('[Middleware] User:', user ? user.id : null)
+  console.log('[Middleware] Is Public Path:', isPublicPath)
+  console.log('[Middleware] Error:', error)
 
   // 認証が必要なパスで未ログインの場合
   if (!isPublicPath && (!user || error)) {
+    console.log('[Middleware] Redirecting to login (auth required, not logged in)')
     const redirectUrl = new URL('/login', request.url)
     redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
@@ -57,9 +60,11 @@ export async function middleware(request: NextRequest) {
 
   // 認証不要なパスでログイン済みの場合
   if (isPublicPath && user) {
+    console.log('[Middleware] Redirecting to / (public path, logged in)')
     return NextResponse.redirect(new URL('/', request.url))
   }
-
+  
+  console.log('[Middleware] Continuing to next response')
   return response
 }
 

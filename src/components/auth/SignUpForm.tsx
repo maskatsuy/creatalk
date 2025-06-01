@@ -1,10 +1,10 @@
 'use client'
 
-import { supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { AuthError } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { useAuthContext } from '@/components/auth/AuthProvider'
 
 export default function SignUpForm() {
   const [email, setEmail] = useState('')
@@ -12,6 +12,7 @@ export default function SignUpForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { signUp } = useAuthContext()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -19,20 +20,7 @@ export default function SignUpForm() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            email: email,
-          }
-        },
-      })
-
-      if (error) throw error
-
-      // アカウント作成成功
+      await signUp(email, password)
       router.push('/login')
       router.refresh()
     } catch (error: unknown) {
