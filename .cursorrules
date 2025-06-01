@@ -411,3 +411,57 @@ src/
 - Test on mobile devices frequently
 - Optimize images with Next.js Image
 - Ensure fast loading times (<2s LCP)
+
+## Next.js 15 Specific Rules
+### Async APIs
+- cookies() is now async - always use await cookies()
+- headers() is now async - always use await headers()
+- searchParams in page props are now async
+
+### Correct Usage Patterns
+#### Server Components
+```typescript
+async function ServerComponent() {
+  const cookieStore = await cookies()
+  const headersList = await headers()
+  // ...
+}
+```
+
+#### Server Actions
+```typescript
+'use server'
+async function serverAction() {
+  const cookieStore = await cookies()
+  // ...
+}
+```
+
+#### Middleware
+```typescript
+import { cookies } from 'next/headers'
+
+export async function middleware(request: NextRequest) {
+  const cookieStore = await cookies()
+  // ...
+}
+```
+
+### Common Patterns to Avoid
+- Using cookies() without await
+- Using headers() without await
+- Synchronous access to request data
+
+### Authentication Patterns
+```typescript
+// Supabase Auth with Next.js 15
+async function getUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      get: (name) => cookieStore.get(name)?.value,
+    },
+  })
+  return await supabase.auth.getUser()
+}
+```
