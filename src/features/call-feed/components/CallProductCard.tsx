@@ -1,9 +1,14 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Users, Video, Heart, Star } from 'lucide-react';
+import { Calendar, Users } from 'lucide-react';
+import { createCheckoutSession } from '@/actions/stripe';
+import { toast } from 'sonner';
 
 export interface Product {
-  id: number;
+  id: string;
+  creatorId: string;
   creatorName: string;
   avatar: string;
   productTitle: string;
@@ -20,8 +25,26 @@ export interface Product {
 // formatDateTime 関数の仮プレースホルダーは不要なので削除
 
 export default function CallProductCard({ product }: { product: Product }) {
+  const [isLoading, setIsLoading] = useState(false);
   const isUrgent = product.remainingSlots <= 3 && product.remainingSlots > 0;
   const isSoldOut = product.remainingSlots === 0;
+
+  const handleReservation = async () => {
+    if (product.type === 'queue') {
+      // 先着制の場合はStripe決済へ
+      setIsLoading(true);
+      try {
+        await createCheckoutSession(product.id, product.creatorId);
+      } catch (error) {
+        console.error('Error creating checkout session:', error);
+        toast.error('予約処理中にエラーが発生しました');
+        setIsLoading(false);
+      }
+    } else {
+      // 時間制は別途実装
+      toast.info('時間制の予約は現在準備中です');
+    }
+  };
 
   return (
     <div className="group relative bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-300 hover:shadow-xl hover:shadow-zinc-100 dark:hover:shadow-zinc-900/20 hover:-translate-y-2">
@@ -122,16 +145,17 @@ export default function CallProductCard({ product }: { product: Product }) {
           </div>
 
           <Button
-            disabled={isSoldOut}
+            disabled={isSoldOut || isLoading}
             variant={isUrgent ? "default" : "secondary"}
             size="sm"
             className={`w-full ${
-              isSoldOut
+              isSoldOut || isLoading
                 ? 'opacity-50 cursor-not-allowed'
                 : ''
             }`}
+            onClick={handleReservation}
           >
-            {isSoldOut ? '売り切れ' : isUrgent ? '急いで予約' : '予約する'}
+            {isLoading ? '処理中...' : isSoldOut ? '売り切れ' : isUrgent ? '急いで予約' : '予約する'}
           </Button>
         </div>
       </div>

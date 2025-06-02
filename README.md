@@ -95,6 +95,65 @@ supabase migration repair --status applied [your-migration-id]
 2. Google OAuth の設定
 3. RLS（Row Level Security）ポリシーの設定
 
+## Stripe CLIセットアップとWebhookテスト
+
+### Stripe CLIのインストール（macOS）
+
+1. Homebrewを使用してStripe CLIをインストール
+```bash
+brew install stripe/stripe-cli/stripe
+```
+
+2. Stripe CLIにログイン
+```bash
+stripe login
+```
+ブラウザが開くので、Stripeアカウントでログインし、アクセスを許可します。
+
+### Webhookのローカルテスト
+
+1. ローカル開発サーバーを起動
+```bash
+npm run dev
+```
+
+2. 別のターミナルでStripe CLIを使用してWebhookをフォワード
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+このコマンドを実行すると、Webhook署名シークレットが表示されます：
+```
+Ready! Your webhook signing secret is whsec_xxxxxxxxxxxxx (^C to quit)
+```
+
+3. `.env.local`ファイルにWebhook署名シークレットを設定
+```env
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+```
+
+4. テストイベントの送信
+
+別のターミナルで以下のコマンドを実行してテストイベントを送信：
+```bash
+# checkout.session.completedイベントをテスト
+stripe trigger checkout.session.completed
+
+# payment_intent.payment_failedイベントをテスト
+stripe trigger payment_intent.payment_failed
+```
+
+### 本番環境のWebhook設定
+
+1. Stripeダッシュボードにログイン
+2. 「開発者」→「Webhook」に移動
+3. 「エンドポイントを追加」をクリック
+4. エンドポイントURL: `https://your-domain.com/api/webhooks/stripe`
+5. リッスンするイベント:
+   - `checkout.session.completed`
+   - `payment_intent.payment_failed`
+6. 生成されたWebhook署名シークレットを本番環境の環境変数に設定
+
 ## アプリケーション構造
 ```
 src/

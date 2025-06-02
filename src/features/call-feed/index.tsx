@@ -2,13 +2,13 @@ import React from 'react';
 import CallProductFeedLayout from './components/CallProductFeedLayout';
 import type { Product } from './components/CallProductCard'; // Product型をインポート
 import { formatDateTime } from '@/lib/utils'; // formatDateTime をインポート
-// import { createServerClientWithCookies } from '@/lib/supabase-server'; // 必要なら後で追加
-// import { cookies } from 'next/headers'; // 必要なら後で追加
+import { createServerClient } from '@/lib/supabase/server';
 
 // ダミーデータをここに移動 (src/app/page.tsx から)
 const followedCreators: Product[] = [
   {
-    id: 1,
+    id: "1",
+    creatorId: "creator-1",
     creatorName: "白猫ちゃん🐱",
     avatar: "https://picsum.photos/150/150?random=2",
     productTitle: "ゲーム配信中の雑談タイム✨",
@@ -22,7 +22,8 @@ const followedCreators: Product[] = [
     isLive: true
   },
   {
-    id: 2,
+    id: "2",
+    creatorId: "creator-2",
     creatorName: "みゆきち♡",
     avatar: "https://picsum.photos/150/150?random=1",
     productTitle: "深夜のまったりおしゃべり💕",
@@ -36,7 +37,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 3,
+    id: "3",
+    creatorId: "creator-3",
     creatorName: "ジョン・スミス",
     avatar: "https://picsum.photos/150/150?random=3",
     productTitle: "英会話レッスン初級編",
@@ -50,7 +52,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 4,
+    id: "4",
+    creatorId: "creator-4",
     creatorName: "Tech Guru 先生",
     avatar: "https://picsum.photos/150/150?random=4",
     productTitle: "プログラミング相談室 (Python)",
@@ -64,7 +67,8 @@ const followedCreators: Product[] = [
     isLive: true
   },
   {
-    id: 5,
+    id: "5",
+    creatorId: "creator-5",
     creatorName: "美麗イラストレーター🎨",
     avatar: "https://picsum.photos/150/150?random=5",
     productTitle: "あなたのアイコン描きます！",
@@ -78,7 +82,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 6,
+    id: "6",
+    creatorId: "creator-6",
     creatorName: "癒しのボイスヒーラーASMR",
     avatar: "https://picsum.photos/150/150?random=6",
     productTitle: "おやすみ前のヒーリングトーク",
@@ -92,7 +97,8 @@ const followedCreators: Product[] = [
     isLive: true
   },
   {
-    id: 7,
+    id: "7",
+    creatorId: "creator-7",
     creatorName: "キャリアコンサルタントMAYU",
     avatar: "https://picsum.photos/150/150?random=7",
     productTitle: "転職・キャリアアップ相談",
@@ -106,7 +112,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 8,
+    id: "8",
+    creatorId: "creator-8",
     creatorName: "旅人トラベラー✈️KEN",
     avatar: "https://picsum.photos/150/150?random=8",
     productTitle: "次の旅行先、一緒に計画しませんか？",
@@ -120,7 +127,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 9,
+    id: "9",
+    creatorId: "creator-9",
     creatorName: "DJ MixMaster K",
     avatar: "https://picsum.photos/150/150?random=9",
     productTitle: "あなたのためのMix作成相談",
@@ -134,7 +142,8 @@ const followedCreators: Product[] = [
     isLive: true
   },
   {
-    id: 10,
+    id: "10",
+    creatorId: "creator-10",
     creatorName: "占い師☆ミラ",
     avatar: "https://picsum.photos/150/150?random=10",
     productTitle: "タロットで見るあなたの運勢",
@@ -148,7 +157,8 @@ const followedCreators: Product[] = [
     isLive: false
   },
   {
-    id: 11,
+    id: "11",
+    creatorId: "creator-11",
     creatorName: "ギタリスト🎸TAKA",
     avatar: "https://picsum.photos/150/150?random=11",
     productTitle: "ギターソロアドバイスします！",
@@ -162,7 +172,8 @@ const followedCreators: Product[] = [
     isLive: true
   },
   {
-    id: 12,
+    id: "12",
+    creatorId: "creator-12",
     creatorName: "ももか🍑",
     avatar: "https://picsum.photos/150/150?random=10",
     productTitle: "筋トレ指導レッスン💪",
@@ -179,12 +190,42 @@ const followedCreators: Product[] = [
 
 // CallFeedFeature のエントリーポイント (サーバーコンポーネント)
 export default async function CallFeedFeature() {
-  // const cookieStore = await cookies(); // 将来的にSupabaseからデータを取得する場合
-  // const supabase = createServerClientWithCookies(cookieStore);
-  // let { data: productsData, error } = await supabase.from('call_products').select('*'); // 仮のデータ取得
+  const supabase = await createServerClient();
+  
+  // データベースから商品データを取得
+  const { data: dbProducts, error } = await supabase
+    .from('call_products')
+    .select('*')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
 
-  // 現時点ではダミーデータを使用
-  let productsData = followedCreators;
+  if (error) {
+    console.error('Error fetching products:', error);
+  }
+
+  // データベースから取得したデータをProduct型に変換
+  let productsData: Product[] = [];
+  
+  if (dbProducts && dbProducts.length > 0) {
+    productsData = dbProducts.map((product, index) => ({
+      id: product.id,
+      creatorId: product.creator_id,
+      creatorName: 'クリエイター', // 一旦固定値
+      avatar: `https://picsum.photos/150/150?random=${index}`,
+      productTitle: product.title,
+      productImage: `https://picsum.photos/400/500?random=${10 + index}`,
+      dateTime: product.slot_date ? `${product.slot_date}T${product.start_time}` : new Date().toISOString(),
+      slotDuration: product.duration_minutes,
+      type: product.type === 'queue' ? 'queue' : 'slot',
+      totalSlots: product.max_participants || 10,
+      remainingSlots: product.remaining_slots || 5,
+      price: product.price,
+      isLive: false // 仮の値
+    }));
+  } else {
+    // データベースにデータがない場合はダミーデータを使用
+    productsData = followedCreators;
+  }
 
   const now = new Date();
   const processedProducts = productsData
