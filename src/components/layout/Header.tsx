@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter, usePathname } from 'next/navigation'
 import { Search, Settings, CreditCard, LogOut, Video, UserPlus, Heart, ChevronRight, Shield, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +19,26 @@ import { useAuthContext } from '@/features/auth'
 
 export function Header() {
   const { user, signOut, isAdmin } = useAuthContext()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  const isSearchPage = pathname === '/search'
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+    } else {
+      router.push('/search')
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch(e)
+    }
+  }
 
   return (
     <header className="border-b">
@@ -32,16 +54,26 @@ export function Header() {
             />
           </Link>
           
-          <div className="hidden md:block">
-            <div className="relative">
-              <Input
-                type="search"
-                placeholder="クリエイターを探す"
-                className="w-80 pr-10"
-              />
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          {!isSearchPage && (
+            <div className="hidden md:block">
+              <form onSubmit={handleSearch} className="relative">
+                <Input
+                  type="search"
+                  placeholder="クリエイターを探す"
+                  className="w-80 pr-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                />
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </form>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
