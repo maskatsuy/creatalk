@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
-import { Search, Settings, CreditCard, LogOut, Video, UserPlus, Heart, ChevronRight, Shield, Users } from 'lucide-react'
+import { Search, Settings, CreditCard, LogOut, Video, UserPlus, Heart, ChevronRight, Shield, Users, Star, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -18,7 +18,7 @@ import {
 import { useAuthContext } from '@/features/auth'
 
 export function Header() {
-  const { user, signOut, isAdmin } = useAuthContext()
+  const { user, signOut, isAdmin, isCreator } = useAuthContext()
   const router = useRouter()
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
@@ -90,14 +90,31 @@ export function Header() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
+                {/* ユーザー情報ヘッダー */}
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="w-full cursor-pointer flex items-center space-x-3 px-2 py-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url} />
-                      <AvatarFallback className="text-xs">
-                        {user.email?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.user_metadata?.avatar_url} />
+                        <AvatarFallback className="text-xs">
+                          {user.email?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {(isCreator || isAdmin) && (
+                        <div className="absolute -bottom-0.5 -right-0.5 flex gap-0.5">
+                          {isCreator && (
+                            <div className="h-3 w-3 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                              <Star className="h-2 w-2 text-yellow-500 fill-yellow-500" />
+                            </div>
+                          )}
+                          {isAdmin && (
+                            <div className="h-3 w-3 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                              <Shield className="h-2 w-2 text-red-500 fill-red-500" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col space-y-1 min-w-0 flex-1">
                       <p className="text-sm font-medium leading-none truncate">
                         {user.user_metadata?.full_name || user.user_metadata?.name || 'ユーザー名未設定'}
@@ -111,6 +128,7 @@ export function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 
+                {/* 一般ユーザー機能 */}
                 <DropdownMenuItem asChild>
                   <Link href="/my-bookings" className="w-full cursor-pointer">
                     <Video className="mr-2 h-4 w-4" />
@@ -132,15 +150,71 @@ export function Header() {
                   </Link>
                 </DropdownMenuItem>
                 
+                {/* クリエイター申請（クリエイターでない場合のみ） */}
+                {!isCreator && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/creator/apply" className="w-full cursor-pointer">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        クリエイター申請
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                {/* クリエイター専用機能 */}
+                {isCreator && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                      クリエイター機能
+                    </div>
+                    <DropdownMenuItem asChild>
+                      <Link href="/creator/dashboard" className="w-full cursor-pointer">
+                        <BarChart3 className="mr-2 h-4 w-4 text-yellow-500" />
+                        ダッシュボード
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/creator/calls" className="w-full cursor-pointer">
+                        <Video className="mr-2 h-4 w-4 text-yellow-500" />
+                        通話管理
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/creator/analytics" className="w-full cursor-pointer">
+                        <BarChart3 className="mr-2 h-4 w-4 text-yellow-500" />
+                        分析
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                {/* 管理者専用機能 */}
+                {isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
+                      管理者機能
+                    </div>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/applications" className="w-full cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4 text-red-500" />
+                        クリエイター申請管理
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/users" className="w-full cursor-pointer">
+                        <Users className="mr-2 h-4 w-4 text-red-500" />
+                        ユーザー管理
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                {/* 設定とログアウト */}
                 <DropdownMenuSeparator />
-                
-                <DropdownMenuItem asChild>
-                  <Link href="/creator/apply" className="w-full cursor-pointer">
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    クリエイター申請
-                  </Link>
-                </DropdownMenuItem>
-                
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="w-full cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
@@ -149,27 +223,6 @@ export function Header() {
                 </DropdownMenuItem>
                 
                 <DropdownMenuSeparator />
-                
-                {isAdmin && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin/applications" className="w-full cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        クリエイター申請管理
-                      </Link>
-                    </DropdownMenuItem>
-                    
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin/users" className="w-full cursor-pointer">
-                        <Users className="mr-2 h-4 w-4" />
-                        ユーザー管理
-                      </Link>
-                    </DropdownMenuItem>
-                    
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                
                 <DropdownMenuItem onSelect={signOut} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   ログアウト

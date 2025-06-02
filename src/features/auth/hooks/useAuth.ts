@@ -11,6 +11,7 @@ export const useAuth = (initialUser: User | null = null) => {
   const [user, setUser] = useState<User | null>(initialUser)
   const [loading, setLoading] = useState(!initialUser)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isCreator, setIsCreator] = useState(false)
   const router = useRouter()
   
   const supabase = createBrowserClient<Database>(
@@ -18,33 +19,37 @@ export const useAuth = (initialUser: User | null = null) => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // Check if user is admin
+  // Check if user is admin or creator
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkUserRoles = async () => {
       if (user) {
         try {
+          // Check for all user roles
           const { data, error } = await supabase
             .from('user_roles')
             .select('role_id')
             .eq('user_id', user.id)
-            .eq('role_id', 'admin')
-            .single()
           
           if (!error && data) {
-            setIsAdmin(true)
+            const roleIds = data.map(role => role.role_id)
+            setIsAdmin(roleIds.includes('admin'))
+            setIsCreator(roleIds.includes('creator'))
           } else {
             setIsAdmin(false)
+            setIsCreator(false)
           }
         } catch (error) {
-          console.error('Error checking admin status:', error)
+          console.error('Error checking user roles:', error)
           setIsAdmin(false)
+          setIsCreator(false)
         }
       } else {
         setIsAdmin(false)
+        setIsCreator(false)
       }
     }
     
-    checkAdminStatus()
+    checkUserRoles()
   }, [user, supabase])
 
   useEffect(() => {
@@ -134,6 +139,7 @@ export const useAuth = (initialUser: User | null = null) => {
     user,
     loading,
     isAdmin,
+    isCreator,
     signIn,
     signUp,
     signOut,
