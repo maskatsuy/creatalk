@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth'
 import { createServerClientWithCookies } from '@/lib/supabase-server'
-import { CreatorApplicationForm } from '@/components/creator/CreatorApplicationForm'
+import { CreatorApplicationForm } from '@/features/creator-application'
 import type { Database } from '@/types/database'
 import { cookies } from 'next/headers'
 

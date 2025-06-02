@@ -1,18 +1,20 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { AuthError } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useAuthContext } from '@/components/auth/AuthProvider'
+import { useAuthContext } from './AuthProvider'
 
-export default function SignUpForm() {
+export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const { signUp } = useAuthContext()
+  const searchParams = useSearchParams()
+  const redirectPath = searchParams.get('redirect') || '/'
+  const { signIn } = useAuthContext()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -20,12 +22,11 @@ export default function SignUpForm() {
     setError(null)
 
     try {
-      await signUp(email, password)
-      router.push('/login')
-      router.refresh()
+      await signIn(email, password)
+      router.push(redirectPath)
     } catch (error: unknown) {
       if (error instanceof AuthError) {
-        setError('アカウント作成に失敗しました。メールアドレスとパスワードを確認してください。')
+        setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。')
       } else {
         setError('予期せぬエラーが発生しました。')
       }
@@ -72,11 +73,11 @@ export default function SignUpForm() {
         disabled={loading}
         className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90 disabled:opacity-50"
       >
-        {loading ? '作成中...' : 'アカウント作成'}
+        {loading ? 'ログイン中...' : 'ログイン'}
       </button>
       <div className="text-sm text-center">
-        <Link href="/login" className="text-primary hover:underline">
-          ログインはこちら
+        <Link href="/signup" className="text-primary hover:underline">
+          新規登録はこちら
         </Link>
       </div>
     </form>

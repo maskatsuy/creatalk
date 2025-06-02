@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { Database } from '@/types/database'
-import LoginForm from '@/components/auth/LoginForm'
+import LoginForm from '@/features/auth/components/LoginForm'
 
 export default async function Login() {
   const cookieStore = await cookies()

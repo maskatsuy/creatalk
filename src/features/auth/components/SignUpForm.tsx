@@ -1,20 +1,18 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { AuthError } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useAuthContext } from '@/components/auth/AuthProvider'
+import { useAuthContext } from './AuthProvider'
 
-export default function LoginForm() {
+export default function SignUpForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectPath = searchParams.get('redirect') || '/'
-  const { signIn } = useAuthContext()
+  const { signUp } = useAuthContext()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -22,11 +20,12 @@ export default function LoginForm() {
     setError(null)
 
     try {
-      await signIn(email, password)
-      router.push(redirectPath)
+      await signUp(email, password)
+      router.push('/login')
+      router.refresh()
     } catch (error: unknown) {
       if (error instanceof AuthError) {
-        setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。')
+        setError('アカウント作成に失敗しました。メールアドレスとパスワードを確認してください。')
       } else {
         setError('予期せぬエラーが発生しました。')
       }
@@ -73,11 +72,11 @@ export default function LoginForm() {
         disabled={loading}
         className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90 disabled:opacity-50"
       >
-        {loading ? 'ログイン中...' : 'ログイン'}
+        {loading ? '作成中...' : 'アカウント作成'}
       </button>
       <div className="text-sm text-center">
-        <Link href="/signup" className="text-primary hover:underline">
-          新規登録はこちら
+        <Link href="/login" className="text-primary hover:underline">
+          ログインはこちら
         </Link>
       </div>
     </form>

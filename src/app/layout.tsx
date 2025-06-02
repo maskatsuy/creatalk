@@ -4,7 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Inter } from 'next/font/google'
 import { Header } from '@/components/layout/Header'
-import { AuthProvider } from '@/components/auth/AuthProvider'
+import { AuthProvider } from '@/features/auth'
 import { getUser } from '@/lib/auth'
 import { cookies } from 'next/headers'
 

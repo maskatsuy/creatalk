@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useAuthContext } from '@/components/auth/AuthProvider'
+import { useAuthContext } from '@/features/auth'
 
 export function Header() {
   const { user, signOut } = useAuthContext()
@@ -32,6 +32,11 @@ export function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="w-full">
                     プロフィール設定
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/creator/apply" className="w-full">
+                    クリエイター申請
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={signOut}>

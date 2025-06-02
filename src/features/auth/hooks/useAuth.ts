@@ -1,3 +1,5 @@
+'use client'
+
 import { useCallback, useEffect, useState } from 'react'
 import { User, AuthChangeEvent, Session, AuthError } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
