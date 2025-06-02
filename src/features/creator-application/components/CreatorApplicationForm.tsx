@@ -15,7 +15,7 @@ interface CreatorApplicationFormProps {
   userId: string
 }
 
-export function CreatorApplicationForm({ userId }: CreatorApplicationFormProps) {
+export function CreatorApplicationForm({ }: CreatorApplicationFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<CreatorApplicationFormData>(initialFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -94,7 +94,7 @@ export function CreatorApplicationForm({ userId }: CreatorApplicationFormProps) 
           description: result.error,
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Submission error:', error)
       toast.error('エラーが発生しました', {
         description: 'もう一度お試しください。',

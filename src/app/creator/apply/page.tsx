@@ -47,16 +47,19 @@ export default async function CreatorApplyPage() {
             あなたのクリエイター申請は現在審査中です。審査結果をお待ちください。
           </p>
         </div>
-      ) : existingApplication?.status === 'rejected' ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-red-800 mb-2">前回の申請が却下されました</h2>
-          <p className="text-red-700 mb-4">
-            {existingApplication.admin_feedback || '申請内容を見直して、再度申請してください。'}
-          </p>
-          <CreatorApplicationForm userId={user.id} />
-        </div>
       ) : (
-        <CreatorApplicationForm userId={user.id} />
+        <>
+          {existingApplication?.status === 'rejected' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-red-800 mb-2">前回の申請は却下されました</h3>
+              <p className="text-red-700 text-sm">
+                <span className="font-medium">却下理由：</span>
+                {existingApplication.admin_feedback || '詳細な理由は提供されていません。申請内容を見直して、再度申請してください。'}
+              </p>
+            </div>
+          )}
+          <CreatorApplicationForm userId={user.id} />
+        </>
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users } from 'lucide-react';
 import { createCheckoutSession } from '@/actions/stripe';
@@ -50,10 +51,11 @@ export default function CallProductCard({ product }: { product: Product }) {
     <div className="group relative bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-300 hover:shadow-xl hover:shadow-zinc-100 dark:hover:shadow-zinc-900/20 hover:-translate-y-2">
       {/* 背景画像 */}
       <div className="relative h-48 overflow-hidden">
-        <img
+        <Image
           src={product.productImage}
           alt={product.productTitle}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
 
@@ -81,10 +83,12 @@ export default function CallProductCard({ product }: { product: Product }) {
 
           <div className="flex items-center gap-2">
             <div className="relative">
-              <img
+              <Image
                 src={product.avatar}
                 alt={product.creatorName}
-                className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-lg"
+                width={32}
+                height={32}
+                className="rounded-full object-cover border-2 border-white shadow-lg"
               />
               {product.isLive && (
                 <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border border-white rounded-full"></div>
