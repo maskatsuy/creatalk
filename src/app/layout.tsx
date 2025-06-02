@@ -20,6 +20,13 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: "Creatalk - クリエイターとファンをつなぐビデオ通話プラットフォーム",
   description: "クリエイターとファンを1対1のビデオ通話でつなぐプラットフォーム。より直接的で価値のある交流を実現します。",
+  icons: [
+    {
+      rel: "icon",
+      type: "image/svg+xml",
+      url: "/favicon.svg",
+    },
+  ],
 };
 
 export default async function RootLayout({
