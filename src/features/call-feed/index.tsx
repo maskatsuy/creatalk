@@ -207,21 +207,33 @@ export default async function CallFeedFeature() {
   let productsData: Product[] = [];
   
   if (dbProducts && dbProducts.length > 0) {
-    productsData = dbProducts.map((product, index) => ({
-      id: product.id,
-      creatorId: product.creator_id,
-      creatorName: 'クリエイター', // 一旦固定値
-      avatar: `https://picsum.photos/150/150?random=${index}`,
-      productTitle: product.title,
-      productImage: `https://picsum.photos/400/500?random=${10 + index}`,
-      dateTime: product.slot_date ? `${product.slot_date}T${product.start_time}` : new Date().toISOString(),
-      slotDuration: product.duration_minutes,
-      type: product.type === 'queue' ? 'queue' : 'slot',
-      totalSlots: product.max_participants || 10,
-      remainingSlots: product.remaining_slots || 5,
-      price: product.price,
-      isLive: false // 仮の値
-    }));
+    // クリエイター情報を別途取得
+    const creatorIds = [...new Set(dbProducts.map(p => p.creator_id))];
+    const { data: creators } = await supabase
+      .from('profiles')
+      .select('id, display_name, email, avatar_url')
+      .in('id', creatorIds);
+
+    const creatorMap = new Map(creators?.map(c => [c.id, c]) || []);
+
+    productsData = dbProducts.map((product, index) => {
+      const creator = creatorMap.get(product.creator_id);
+      return {
+        id: product.id,
+        creatorId: product.creator_id,
+        creatorName: creator?.display_name || creator?.email || 'クリエイター',
+        avatar: creator?.avatar_url || `https://picsum.photos/150/150?random=${index}`,
+        productTitle: product.title,
+        productImage: `https://picsum.photos/400/500?random=${10 + index}`,
+        dateTime: product.slot_date ? `${product.slot_date}T${product.start_time}` : new Date().toISOString(),
+        slotDuration: product.duration_minutes,
+        type: product.type === 'queue' ? 'queue' : 'slot',
+        totalSlots: product.max_participants || 10,
+        remainingSlots: product.remaining_slots || 5,
+        price: product.price,
+        isLive: false // 仮の値
+      };
+    });
   } else {
     // データベースにデータがない場合はダミーデータを使用
     productsData = followedCreators;

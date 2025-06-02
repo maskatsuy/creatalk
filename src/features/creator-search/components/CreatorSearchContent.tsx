@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +14,9 @@ import {
 import { Search, Filter, ArrowUpDown } from 'lucide-react'
 import { CreatorCard } from './CreatorCard'
 import { Pagination } from './Pagination'
-import { searchCreators, getPopularCreators } from '../actions'
-import type { Creator, CreatorSearchResult } from '../types'
+import { getPopularCreators } from '../actions'
+import { useCreatorSearch } from '../hooks'
+import type { Creator } from '../types'
 
 interface CreatorSearchContentProps {
   initialQuery?: string
@@ -36,29 +36,28 @@ const categories = [
 ]
 
 export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps) {
-  const router = useRouter()
-  
-  const [query, setQuery] = useState(initialQuery || '')
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [sortBy, setSortBy] = useState<'followers' | 'created_at' | 'last_call'>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [searchResult, setSearchResult] = useState<CreatorSearchResult>({
-    creators: [],
-    total: 0,
-    totalPages: 0,
-    currentPage: 1,
-    hasNextPage: false,
-    hasPrevPage: false
-  })
-  const [popularCreators, setPopularCreators] = useState<Creator[]>([])
-  const [loading, setLoading] = useState(false)
-  const [hasSearched, setHasSearched] = useState(!!initialQuery)
+  const {
+    // States
+    query,
+    setQuery,
+    selectedCategory,
+    sortBy,
+    sortOrder,
+    currentPage,
+    searchResult,
+    loading,
+    hasSearched,
+    
+    // Handlers
+    handleSearch,
+    handleCategoryChange,
+    handleSortChange,
+    handleOrderChange,
+    handlePageChange,
+    performSearch
+  } = useCreatorSearch({ initialQuery })
 
-  // initialQueryが変更されたときにqueryを更新
-  useEffect(() => {
-    setQuery(initialQuery || '')
-  }, [initialQuery])
+  const [popularCreators, setPopularCreators] = useState<Creator[]>([])
 
   // 人気クリエイターを初期読み込み
   useEffect(() => {
@@ -72,116 +71,18 @@ export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps
     loadPopularCreators()
   }, [])
 
-  const performSearch = useCallback(async (
-    searchQuery?: string, 
-    category?: string, 
-    sort?: typeof sortBy, 
-    order?: typeof sortOrder, 
-    page?: number
-  ) => {
-    const queryToSearch = searchQuery || query
-    const categoryToUse = category || selectedCategory
-    const sortToUse = sort || sortBy
-    const orderToUse = order || sortOrder
-    const pageToUse = page || currentPage
-
-    if (!queryToSearch.trim() && !categoryToUse) {
-      setHasSearched(false)
-      setSearchResult({
-        creators: [],
-        total: 0,
-        totalPages: 0,
-        currentPage: 1,
-        hasNextPage: false,
-        hasPrevPage: false
-      })
-      return
-    }
-
-    setLoading(true)
-    setHasSearched(true)
-
-    try {
-      const result = await searchCreators({
-        query: queryToSearch.trim() || undefined,
-        category: categoryToUse || undefined,
-        sortBy: sortToUse,
-        sortOrder: orderToUse,
-        page: pageToUse,
-        limit: 12
-      })
-
-      setSearchResult(result)
-      setCurrentPage(pageToUse)
-
-      // URLを更新
-      const params = new URLSearchParams()
-      if (queryToSearch.trim()) {
-        params.set('q', queryToSearch.trim())
-      }
-      if (categoryToUse) {
-        params.set('category', categoryToUse)
-      }
-      if (sortToUse !== 'created_at') {
-        params.set('sort', sortToUse)
-      }
-      if (orderToUse !== 'desc') {
-        params.set('order', orderToUse)
-      }
-      if (pageToUse > 1) {
-        params.set('page', pageToUse.toString())
-      }
-      
-      const newUrl = params.toString() ? `/search?${params.toString()}` : '/search'
-      router.replace(newUrl)
-
-    } catch (error) {
-      console.error('Search error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [router, currentPage, query, selectedCategory, sortBy, sortOrder])
-
-  const handleSearch = async (searchQuery?: string) => {
-    await performSearch(searchQuery, selectedCategory, sortBy, sortOrder, 1)
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch()
     }
   }
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category)
-    setCurrentPage(1)
-    setTimeout(() => performSearch(query, category, sortBy, sortOrder, 1), 0)
-  }
-
-  const handleSortChange = (newSortBy: typeof sortBy) => {
-    setSortBy(newSortBy)
-    setCurrentPage(1)
-    setTimeout(() => performSearch(query, selectedCategory, newSortBy, sortOrder, 1), 0)
-  }
-
-  const handleOrderChange = () => {
-    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc'
-    setSortOrder(newOrder)
-    setCurrentPage(1)
-    setTimeout(() => performSearch(query, selectedCategory, sortBy, newOrder, 1), 0)
-  }
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    performSearch(query, selectedCategory, sortBy, sortOrder, page)
-  }
-
   // 初期クエリがある場合は検索実行
   useEffect(() => {
     if (initialQuery) {
-      performSearch(initialQuery, selectedCategory, sortBy, sortOrder, 1)
+      performSearch(initialQuery, '', 'created_at', 'desc', 1)
     }
-  }, [initialQuery, selectedCategory, sortBy, sortOrder, performSearch])
+  }, [initialQuery, performSearch])
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -200,7 +101,7 @@ export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps
               placeholder="クリエイター名を入力..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               className="pl-10"
             />
           </div>
@@ -210,7 +111,7 @@ export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps
         </div>
 
         {/* フィルターとソート */}
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* カテゴリーフィルター */}
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="w-4 h-4 text-gray-500" />
@@ -228,10 +129,13 @@ export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps
           </div>
 
           {/* ソートオプション */}
-          <div className="flex items-center gap-2">
-            <ArrowUpDown className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-500">並び順:</span>
-            <Select value={sortBy} onValueChange={handleSortChange}>
+          <div className="flex items-center gap-2 lg:ml-auto">
+            <ArrowUpDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            <span className="text-sm text-gray-500 whitespace-nowrap">並び順:</span>
+            <Select 
+              value={sortBy} 
+              onValueChange={(value) => handleSortChange(value as typeof sortBy)}
+            >
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -245,7 +149,7 @@ export function CreatorSearchContent({ initialQuery }: CreatorSearchContentProps
               variant="outline"
               size="sm"
               onClick={handleOrderChange}
-              className="min-w-16"
+              className="whitespace-nowrap"
             >
               {sortOrder === 'desc' ? '降順' : '昇順'}
             </Button>

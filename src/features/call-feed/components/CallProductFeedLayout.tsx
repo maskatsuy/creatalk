@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import CallProductCard, { type Product } from './CallProductCard'; // Product型もインポート
 import { Heart } from 'lucide-react'; // 空の状態表示用
 
@@ -7,6 +10,12 @@ interface CallProductFeedLayoutProps {
 }
 
 export default function CallProductFeedLayout({ products }: CallProductFeedLayoutProps) {
+  const router = useRouter();
+
+  const handleSearchCreators = () => {
+    router.push('/search');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900">
       <div className="container mx-auto px-6 py-8">
@@ -36,7 +45,10 @@ export default function CallProductFeedLayout({ products }: CallProductFeedLayou
             <p className="text-zinc-600 dark:text-zinc-400 mb-6">
               フォロー中のクリエイターからの新しい通話予定をお待ちください
             </p>
-            <button className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+            <button 
+              onClick={handleSearchCreators}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
               クリエイターを探す
             </button>
           </div>
