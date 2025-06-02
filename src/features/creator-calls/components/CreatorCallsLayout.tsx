@@ -7,18 +7,33 @@ import { RefreshCw } from 'lucide-react'
 import { CallFilters } from './CallFilters'
 import { ReservationCard } from './ReservationCard'
 import { CreateCallPlanDialog } from './CreateCallPlanDialog'
+import { CallPlanCard } from './CallPlanCard'
+import { ActiveCallAlert } from './ActiveCallAlert'
 import { 
   getCreatorReservations, 
-  getCreatorCallProducts
+  getCreatorCallProducts,
+  getActiveCallBookings
 } from '../actions'
 import type { CallReservation, CallProduct, CallFilters as Filters } from '../types'
 
 export function CreatorCallsLayout() {
   const [reservations, setReservations] = useState<CallReservation[]>([])
   const [products, setProducts] = useState<CallProduct[]>([])
+  const [activeBookings, setActiveBookings] = useState<Array<{
+    id: string
+    status: 'confirmed' | 'in_progress'
+    created_at: string
+    call_products: {
+      title: string
+      type: string
+      duration_minutes: number
+    }
+    room_url?: string
+  }>>([])
   const [filters, setFilters] = useState<Filters>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeTab, setActiveTab] = useState<'plans' | 'reservations'>('plans')
 
   const loadData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
@@ -28,9 +43,10 @@ export function CreatorCallsLayout() {
     }
 
     try {
-      const [reservationsResult, productsResult] = await Promise.all([
+      const [reservationsResult, productsResult, activeBookingsResult] = await Promise.all([
         getCreatorReservations(filters),
-        getCreatorCallProducts()
+        getCreatorCallProducts(),
+        getActiveCallBookings()
       ])
 
       if (reservationsResult.error) {
@@ -43,6 +59,13 @@ export function CreatorCallsLayout() {
         toast.error(productsResult.error)
       } else {
         setProducts(productsResult.products || [])
+      }
+
+      if (activeBookingsResult.error) {
+        // Active bookings error is not critical, just log silently
+        setActiveBookings([])
+      } else {
+        setActiveBookings(activeBookingsResult.bookings || [])
       }
     } catch {
       toast.error('データの読み込みに失敗しました')
@@ -142,7 +165,7 @@ export function CreatorCallsLayout() {
             通話管理
           </h1>
           <p className="text-muted-foreground">
-            予約の管理、通話の開始、履歴の確認ができます
+            作成したプランの管理、予約状況の確認ができます
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -158,54 +181,126 @@ export function CreatorCallsLayout() {
         </div>
       </div>
 
-      {/* Filters */}
-      <CallFilters 
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
-        products={products}
+      {/* Active Call Alert */}
+      <ActiveCallAlert 
+        bookings={activeBookings}
+        onUpdate={handleRefresh}
       />
 
-      {/* Reservations List */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
-            予約一覧 ({reservations.length}件)
-          </h2>
-        </div>
+      {/* Filters - only show for reservations tab */}
+      {activeTab === 'reservations' && (
+        <CallFilters 
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          products={products}
+        />
+      )}
 
-        {reservations.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-gray-400 mb-4">
-              <svg 
-                className="mx-auto h-12 w-12" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v1l-1 5a2 2 0 01-2 2H6a2 2 0 01-2-2l-1-5V9a2 2 0 012-2h3z" 
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              予約がありません
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400">
-              現在の条件では予約が見つかりませんでした
-            </p>
+      {/* Tab Navigation */}
+      <div className="bg-white dark:bg-gray-900 border rounded-lg mb-6">
+        <div className="flex border-b">
+          <button
+            onClick={() => setActiveTab('plans')}
+            className={`px-6 py-3 font-medium text-sm transition-colors ${
+              activeTab === 'plans'
+                ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            作成したプラン ({products.length}件)
+          </button>
+          <button
+            onClick={() => setActiveTab('reservations')}
+            className={`px-6 py-3 font-medium text-sm transition-colors ${
+              activeTab === 'reservations'
+                ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            受けた予約 ({reservations.length}件)
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-6">
+        {activeTab === 'plans' ? (
+          // Plans List
+          <div>
+            {products.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <svg 
+                    className="mx-auto h-12 w-12" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  プランがありません
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400">
+                  右上の「プラン作成」ボタンから新しいプランを作成してください
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {products.map((product) => (
+                  <CallPlanCard
+                    key={product.id}
+                    product={product}
+                    onUpdate={handleRefresh}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : (
-          <div className="grid gap-4">
-            {reservations.map((reservation) => (
-              <ReservationCard
-                key={reservation.id}
-                reservation={reservation}
-                onStatusUpdate={handleReservationUpdate}
-              />
-            ))}
+          // Reservations List
+          <div>
+            {reservations.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <svg 
+                    className="mx-auto h-12 w-12" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a2 2 0 012 2v1l-1 5a2 2 0 01-2 2H6a2 2 0 01-2-2l-1-5V9a2 2 0 012-2h3z" 
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  予約がありません
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400">
+                  まだ誰もあなたのプランに申し込んでいません
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {reservations.map((reservation) => (
+                  <ReservationCard
+                    key={reservation.id}
+                    reservation={reservation}
+                    onStatusUpdate={handleReservationUpdate}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
