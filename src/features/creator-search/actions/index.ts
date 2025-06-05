@@ -1,11 +1,13 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClientWithCookies } from '@/lib/supabase-server'
+import { cookies } from 'next/headers'
 import type { Creator, CreatorSearchParams, CreatorSearchResult } from '../types'
 
 export async function searchCreators(params: CreatorSearchParams): Promise<CreatorSearchResult> {
   try {
-    const supabase = await createServerClient()
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
     
     let query = supabase
       .from('creator_applications')
@@ -101,7 +103,7 @@ export async function searchCreators(params: CreatorSearchParams): Promise<Creat
       follower_count: app.follower_count || 0,
       created_at: app.created_at,
       last_call_created_at: app.last_call_created_at,
-      profiles: app.profiles
+      profiles: Array.isArray(app.profiles) ? app.profiles[0] || null : app.profiles
     }))
 
     const total = count || 0
@@ -121,6 +123,10 @@ export async function searchCreators(params: CreatorSearchParams): Promise<Creat
     return {
       creators: [],
       total: 0,
+      totalPages: 0,
+      currentPage: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
       error: 'クリエイターの検索に失敗しました'
     }
   }
@@ -131,7 +137,8 @@ export async function getPopularCreators(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = await createServerClient()
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
     
     const { data: applications, error } = await supabase
       .from('creator_applications')
@@ -176,7 +183,7 @@ export async function getPopularCreators(): Promise<{
       follower_count: app.follower_count || 0,
       created_at: app.created_at,
       last_call_created_at: app.last_call_created_at,
-      profiles: app.profiles
+      profiles: Array.isArray(app.profiles) ? app.profiles[0] || null : app.profiles
     }))
 
     return { creators }

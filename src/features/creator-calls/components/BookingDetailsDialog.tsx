@@ -42,6 +42,8 @@ interface ProductDetail {
   slot_date?: string
   start_time?: string
   end_time?: string
+  available_from?: string
+  available_until?: string
   duration_minutes: number
   max_participants?: number
   remaining_slots?: number

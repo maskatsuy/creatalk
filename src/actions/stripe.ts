@@ -1,15 +1,17 @@
 'use server';
 
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClientWithCookies } from '@/lib/supabase-server';
+import { cookies } from 'next/headers';
 import Stripe from 'stripe';
 import { redirect } from 'next/navigation';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-05-28.basil',
 });
 
 export async function createCheckoutSession(productId: string, creatorId: string) {
-  const supabase = await createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClientWithCookies(cookieStore);
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {

@@ -1,10 +1,12 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClientWithCookies } from '@/lib/supabase-server'
+import { cookies } from 'next/headers'
 import { CreatorApplicationFormData } from './types'
 
 export async function submitCreatorApplication(formData: CreatorApplicationFormData) {
-  const supabase = await createServerClient()
+  const cookieStore = await cookies()
+  const supabase = createServerClientWithCookies(cookieStore)
   
   // 認証状態を確認
   const { data: { user }, error: authError } = await supabase.auth.getUser()

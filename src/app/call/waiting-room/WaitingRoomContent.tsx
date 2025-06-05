@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { verifyPaymentSession } from '@/actions/stripe';
-import { createClient } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Video, Mic, Settings, Users, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -53,7 +53,7 @@ export default function WaitingRoomContent() {
         }
 
         // 商品情報を取得
-        const supabase = createClient();
+        // supabase is already imported
         const { data: productData, error: productError } = await supabase
           .from('call_products')
           .select('*, profiles!call_products_creator_id_fkey(display_name, avatar_url)')

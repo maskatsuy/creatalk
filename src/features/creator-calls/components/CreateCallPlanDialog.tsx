@@ -19,7 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Plus, Clock, Users, Calendar, Info, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, parse, addMinutes, isBefore } from 'date-fns'
-import { createCallPlan } from '../actions'
+import { createCallPlan, checkTimeConflict } from '../actions'
 
 interface CreateCallPlanDialogProps {
   onPlanCreated?: () => void
@@ -64,6 +64,11 @@ export function CreateCallPlanDialog({ onPlanCreated }: CreateCallPlanDialogProp
 
   // Warning state
   const [slotWarning, setSlotWarning] = useState<string>('')
+  const [timeConflict, setTimeConflict] = useState<{
+    hasConflict: boolean
+    conflictPlan?: { title: string; time: string }
+  }>({ hasConflict: false })
+  const [checkingConflict, setCheckingConflict] = useState(false)
 
   // Recalculate slots when relevant fields change
   useEffect(() => {
@@ -117,6 +122,44 @@ export function CreateCallPlanDialog({ onPlanCreated }: CreateCallPlanDialogProp
     setCalculatedSlots(slots)
   }, [planType, startDate, startTime, duration, breakTime, slotCount])
 
+  // Check for time conflicts when start/end time changes
+  useEffect(() => {
+    if (!startTime || !endTime) {
+      setTimeConflict({ hasConflict: false })
+      return
+    }
+
+    const debounceTimer = setTimeout(async () => {
+      setCheckingConflict(true)
+      try {
+        const result = await checkTimeConflict({
+          type: planType,
+          startTime,
+          endTime
+        })
+
+        if (result.error) {
+          console.error('Error checking time conflict:', result.error)
+          setTimeConflict({ hasConflict: false })
+        } else if (result.hasConflict) {
+          setTimeConflict({
+            hasConflict: true,
+            conflictPlan: result.conflictPlan
+          })
+        } else {
+          setTimeConflict({ hasConflict: false })
+        }
+      } catch (error) {
+        console.error('Error checking time conflict:', error)
+        setTimeConflict({ hasConflict: false })
+      } finally {
+        setCheckingConflict(false)
+      }
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(debounceTimer)
+  }, [planType, startTime, endTime])
+
   const handleSubmit = async () => {
     // Validation
     if (!title || !price || !startDate || !startTime || !endTime || !duration) {
@@ -140,6 +183,12 @@ export function CreateCallPlanDialog({ onPlanCreated }: CreateCallPlanDialogProp
     
     if (isBefore(selectedStart, minStartTime)) {
       toast.error('開始日時は現在時刻の5分後以降に設定してください')
+      return
+    }
+
+    // Check for time conflicts before submitting
+    if (timeConflict.hasConflict) {
+      toast.error('時間が重複しているため、プランを作成できません')
       return
     }
 
@@ -503,6 +552,37 @@ export function CreateCallPlanDialog({ onPlanCreated }: CreateCallPlanDialogProp
               )}
             </div>
           )}
+
+          {/* Time Conflict Warning */}
+          {checkingConflict && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-sm text-yellow-700 dark:text-yellow-300">
+                  時間重複をチェック中...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {timeConflict.hasConflict && timeConflict.conflictPlan && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                    時間が重複しています
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    既存のプラン「{timeConflict.conflictPlan.title}」({timeConflict.conflictPlan.time})と重複しています。
+                  </p>
+                  <p className="text-xs text-red-500 dark:text-red-500">
+                    別の時間帯を選択してください。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -511,9 +591,17 @@ export function CreateCallPlanDialog({ onPlanCreated }: CreateCallPlanDialogProp
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={loading || (planType === 'fixed' && calculatedSlots.length === 0)}
+            disabled={
+              loading || 
+              (planType === 'fixed' && calculatedSlots.length === 0) ||
+              timeConflict.hasConflict ||
+              checkingConflict
+            }
           >
-            {loading ? '作成中...' : 'プランを作成'}
+            {loading ? '作成中...' : 
+             checkingConflict ? 'チェック中...' :
+             timeConflict.hasConflict ? '時間重複あり' :
+             'プランを作成'}
           </Button>
         </DialogFooter>
       </DialogContent>

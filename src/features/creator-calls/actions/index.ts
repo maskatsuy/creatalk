@@ -3,6 +3,7 @@
 import { createServerClientWithCookies } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import { format, parse, isBefore } from 'date-fns'
+import { dailyService } from '@/lib/daily'
 import type { CallProduct, CallStats, CallFilters } from '../types'
 
 export async function getActiveCallBookings() {
@@ -16,23 +17,153 @@ export async function getActiveCallBookings() {
       return { error: 'Unauthorized' }
     }
 
-    // Get active/in-progress bookings
-    const { data: bookings, error } = await supabase
+    // Get confirmed/in_progress bookings
+    const { data: bookings, error: bookingsError } = await supabase
       .from('call_bookings')
       .select(`
         *,
-        call_products!inner(title, type, duration_minutes)
+        call_products!inner(title, type, duration_minutes),
+        call_rooms!call_bookings_room_id_fkey(
+          id,
+          daily_room_url
+        )
       `)
       .eq('creator_id', user.id)
       .in('status', ['confirmed', 'in_progress'])
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching active bookings:', error)
-      return { error: error.message }
+    // Also check for active call plans (current time within schedule)
+    const now = new Date()
+    const currentTime = format(now, 'HH:mm')
+    const currentDate = format(now, 'yyyy-MM-dd')
+
+    const { data: activePlans } = await supabase
+      .from('call_products')
+      .select(`
+        id,
+        title,
+        type,
+        duration_minutes,
+        slot_date,
+        start_time,
+        end_time,
+        available_from,
+        available_until,
+        max_participants,
+        remaining_slots
+      `)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+
+    const activeBookingsArray = bookings || []
+
+    // Check if any plans are currently in their scheduled time
+    if (activePlans && activePlans.length > 0) {
+      for (const plan of activePlans) {
+        let isCurrentlyActive = false
+
+        if (plan.type === 'queue' && plan.slot_date && plan.start_time && plan.end_time) {
+          // Queue type: check if today matches slot_date and current time is within (start_time - 10 minutes) to end_time
+          if (plan.slot_date === currentDate) {
+            // Convert time strings to HH:mm format for comparison
+            const startTime = plan.start_time.substring(0, 5) // "13:06:00" -> "13:06"
+            const endTime = plan.end_time.substring(0, 5)     // "14:57:00" -> "14:57"
+            
+            // Calculate 10 minutes before start time
+            const [startHour, startMin] = startTime.split(':').map(Number)
+            const startDate = new Date()
+            startDate.setHours(startHour, startMin, 0, 0)
+            const preStartDate = new Date(startDate.getTime() - 10 * 60 * 1000) // 10分前
+            const preStartTime = preStartDate.toTimeString().substring(0, 5)
+            
+            // Handle time comparison (considering possible next day)
+            if (endTime < preStartTime) {
+              // Crosses midnight
+              isCurrentlyActive = currentTime >= preStartTime || currentTime <= endTime
+            } else {
+              // Same day - check if current time is within (start - 10min) to end
+              isCurrentlyActive = currentTime >= preStartTime && currentTime <= endTime
+            }
+          }
+        } else if (plan.type === 'fixed' && plan.available_from && plan.available_until) {
+          // Fixed type: check if current time is within (available_from - 10 minutes) to available_until
+          const availableFrom = new Date(plan.available_from)
+          const availableUntil = new Date(plan.available_until)
+          const preAvailableFrom = new Date(availableFrom.getTime() - 10 * 60 * 1000) // 10分前
+          isCurrentlyActive = now >= preAvailableFrom && now <= availableUntil
+        }
+
+        if (isCurrentlyActive) {
+          // Check if plan has actually started (not just in pre-start period)
+          let hasStarted = false
+          
+          if (plan.type === 'queue' && plan.slot_date && plan.start_time && plan.end_time) {
+            const startTime = plan.start_time.substring(0, 5)
+            const endTime = plan.end_time.substring(0, 5)
+            
+            if (endTime < startTime) {
+              // Crosses midnight
+              hasStarted = currentTime >= startTime || currentTime <= endTime
+            } else {
+              // Same day
+              hasStarted = currentTime >= startTime && currentTime <= endTime
+            }
+          } else if (plan.type === 'fixed' && plan.available_from) {
+            const availableFrom = new Date(plan.available_from)
+            hasStarted = now >= availableFrom
+          }
+          
+          // Calculate remaining time until start
+          let minutesUntilStart = 0
+          if (!hasStarted) {
+            if (plan.type === 'queue' && plan.slot_date && plan.start_time) {
+              const startTime = plan.start_time.substring(0, 5)
+              const [startHour, startMin] = startTime.split(':').map(Number)
+              const startDate = new Date()
+              startDate.setHours(startHour, startMin, 0, 0)
+              
+              // If start time is before current time, assume it's for tomorrow
+              if (startDate <= now) {
+                startDate.setDate(startDate.getDate() + 1)
+              }
+              
+              minutesUntilStart = Math.max(0, Math.floor((startDate.getTime() - now.getTime()) / (1000 * 60)))
+            } else if (plan.type === 'fixed' && plan.available_from) {
+              const availableFrom = new Date(plan.available_from)
+              minutesUntilStart = Math.max(0, Math.floor((availableFrom.getTime() - now.getTime()) / (1000 * 60)))
+            }
+          }
+
+          // Create a pseudo-booking object for active plans
+          const pseudoBooking = {
+            id: `plan-${plan.id}`,
+            status: 'confirmed' as const,
+            created_at: now.toISOString(),
+            plan_id: plan.id,
+            call_products: {
+              title: plan.title,
+              type: plan.type,
+              duration_minutes: plan.duration_minutes
+            },
+            call_rooms: null,
+            is_active_plan: true, // Flag to distinguish from real bookings
+            is_pre_start: !hasStarted, // Flag to indicate if in pre-start period
+            minutes_until_start: minutesUntilStart, // Minutes remaining until start
+            remaining_slots: plan.remaining_slots || 0,
+            max_participants: plan.max_participants || 0
+          }
+          
+          activeBookingsArray.push(pseudoBooking)
+        }
+      }
     }
 
-    return { bookings: bookings || [] }
+    if (bookingsError) {
+      console.error('Error fetching bookings:', bookingsError)
+      return { error: bookingsError.message }
+    }
+
+    return { bookings: activeBookingsArray }
   } catch (error) {
     console.error('Error in getActiveCallBookings:', error)
     return { error: 'Internal server error' }
@@ -90,7 +221,11 @@ export async function getCreatorReservations(filters: CallFilters = {}) {
   }
 }
 
-export async function getCreatorCallProducts() {
+export async function getCreatorCallProducts(options: {
+  page?: number
+  limit?: number
+  status?: 'active' | 'inactive'
+} = {}) {
   try {
     const cookieStore = await cookies()
     const supabase = createServerClientWithCookies(cookieStore)
@@ -100,9 +235,12 @@ export async function getCreatorCallProducts() {
     if (authError || !user) {
       return { error: 'Unauthorized' }
     }
-    
 
-    const { data, error } = await supabase
+    const page = options.page || 1
+    const limit = options.limit || 10
+    const offset = (page - 1) * limit
+
+    let query = supabase
       .from('call_products')
       .select(`
         id,
@@ -114,10 +252,24 @@ export async function getCreatorCallProducts() {
         duration_minutes,
         status,
         created_at,
-        updated_at
-      `)
+        updated_at,
+        slot_date,
+        start_time,
+        end_time,
+        available_from,
+        available_until,
+        max_participants,
+        remaining_slots
+      `, { count: 'exact' })
       .eq('creator_id', user.id)
       .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (options.status) {
+      query = query.eq('status', options.status)
+    }
+
+    const { data, error, count } = await query
 
     if (error) {
       console.error('Error fetching call products:', error)
@@ -131,7 +283,19 @@ export async function getCreatorCallProducts() {
       recording_enabled: false // Default value since it's not in the DB yet
     })) || []
 
-    return { products: products as CallProduct[] }
+    const totalPages = Math.ceil((count || 0) / limit)
+
+    return { 
+      products: products as CallProduct[],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    }
   } catch (error) {
     console.error('Error in getCreatorCallProducts:', error)
     return { error: 'Internal server error' }
@@ -296,10 +460,17 @@ export async function getProductBookingDetails(productId: string) {
       return { error: 'Product not found' }
     }
 
-    // Get bookings first
-    const { data: rawBookings, error: bookingsError } = await supabase
+    // Get bookings with user profiles using manual JOIN (user_id matches profiles.id)
+    const { data: bookings, error: bookingsError } = await supabase
       .from('call_bookings')
-      .select('*')
+      .select(`
+        *,
+        profiles!user_id(
+          id,
+          display_name,
+          avatar_url
+        )
+      `)
       .eq('product_id', productId)
       .eq('creator_id', user.id)
       .order('created_at', { ascending: true })
@@ -307,29 +478,6 @@ export async function getProductBookingDetails(productId: string) {
     if (bookingsError) {
       console.error('Error fetching booking details:', bookingsError)
       return { error: bookingsError.message }
-    }
-
-    // Get user profiles for each booking
-    const bookings = []
-    if (rawBookings && rawBookings.length > 0) {
-      const userIds = rawBookings.map(b => b.user_id)
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', userIds)
-
-      if (profilesError) {
-        console.warn('Error fetching profiles:', profilesError)
-      }
-
-      // Combine bookings with profile data
-      for (const booking of rawBookings) {
-        const userProfile = profiles?.find(p => p.id === booking.user_id)
-        bookings.push({
-          ...booking,
-          profiles: userProfile || { display_name: null, avatar_url: null }
-        })
-      }
     }
 
     // Calculate basic stats
@@ -439,25 +587,104 @@ export async function startCall(bookingId: string) {
       return { error: 'Not authorized to start this call' }
     }
 
-    // TODO: Integrate with Daily.co API to create room
-    const roomUrl = `https://creatalk.daily.co/room/${bookingId}`
-
-    // Update booking status to in_progress and store room URL
-    const { error: updateError } = await supabase
+    // Get booking details
+    const { data: bookingData, error: bookingError } = await supabase
       .from('call_bookings')
-      .update({ 
-        status: 'in_progress',
-        room_url: roomUrl,
-        updated_at: new Date().toISOString()
-      })
+      .select(`
+        *,
+        call_products!inner(
+          duration_minutes,
+          type,
+          title
+        )
+      `)
       .eq('id', bookingId)
+      .single()
 
-    if (updateError) {
-      console.error('Error starting call:', updateError)
-      return { error: updateError.message }
+    if (bookingError || !bookingData) {
+      return { error: 'Booking details not found' }
     }
 
-    return { roomUrl, success: true }
+    // Create Daily.co room
+    const roomName = `call-${bookingId.substring(0, 8)}-${Date.now()}`
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + bookingData.call_products.duration_minutes + 30) // Add 30min buffer
+
+    try {
+      const dailyRoom = await dailyService.createRoom({
+        name: roomName,
+        privacy: 'private',
+        properties: {
+          max_participants: 2,
+          enable_recording: false, // TODO: Check product settings
+          enable_chat: true,
+          enable_screenshare: true,
+          exp: Math.floor(expiresAt.getTime() / 1000),
+          lang: 'ja'
+        }
+      })
+
+      // Create call_rooms record
+      const { data: callRoom, error: roomError } = await supabase
+        .from('call_rooms')
+        .insert({
+          booking_id: bookingId,
+          creator_id: user.id,
+          daily_room_name: roomName,
+          daily_room_url: dailyRoom.url,
+          max_participants: 2,
+          enable_recording: false,
+          expires_at: expiresAt.toISOString()
+        })
+        .select()
+        .single()
+
+      if (roomError) {
+        // Rollback: Delete Daily.co room if database insert fails
+        await dailyService.deleteRoom(roomName).catch(console.error)
+        console.error('Error creating call room record:', roomError)
+        return { error: 'Failed to create call room' }
+      }
+
+      // Update booking status and link to room
+      const { error: updateError } = await supabase
+        .from('call_bookings')
+        .update({ 
+          status: 'in_progress',
+          room_id: callRoom.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId)
+
+      if (updateError) {
+        // Rollback: Delete room if booking update fails
+        await dailyService.deleteRoom(roomName).catch(console.error)
+        await supabase.from('call_rooms').delete().eq('id', callRoom.id)
+        console.error('Error updating booking:', updateError)
+        return { error: updateError.message }
+      }
+
+      // Create creator token
+      const creatorToken = await dailyService.createMeetingToken(roomName, {
+        user_id: user.id,
+        user_name: 'クリエイター',
+        is_owner: true,
+        exp: Math.floor(expiresAt.getTime() / 1000)
+      })
+
+      // 埋め込みページのURLを構築
+      const embedUrl = `/call/${callRoom.id}?url=${encodeURIComponent(dailyRoom.url)}&t=${creatorToken}&duration=${bookingData.call_products.duration_minutes}&booking=${bookingId}`
+
+      return { 
+        roomUrl: `${dailyRoom.url}?t=${creatorToken}`,
+        embedUrl,
+        roomId: callRoom.id,
+        success: true 
+      }
+    } catch (error) {
+      console.error('Error creating Daily.co room:', error)
+      return { error: 'Failed to create video room' }
+    }
   } catch (error) {
     console.error('Error in startCall:', error)
     return { error: 'Internal server error' }
@@ -475,6 +702,50 @@ export async function endCall(bookingId: string) {
       return { error: 'Unauthorized' }
     }
 
+    // Get booking and room details
+    const { data: booking, error: bookingError } = await supabase
+      .from('call_bookings')
+      .select(`
+        *,
+        call_rooms!inner(
+          id,
+          daily_room_name,
+          status
+        )
+      `)
+      .eq('id', bookingId)
+      .eq('creator_id', user.id)
+      .single()
+
+    if (bookingError || !booking) {
+      return { error: 'Booking not found' }
+    }
+
+    // End the call room
+    if (booking.call_rooms && booking.call_rooms.status === 'active') {
+      // Delete Daily.co room
+      try {
+        await dailyService.deleteRoom(booking.call_rooms.daily_room_name)
+      } catch (error) {
+        console.error('Error deleting Daily.co room:', error)
+        // Continue even if Daily.co deletion fails
+      }
+
+      // Update room status
+      const { error: roomUpdateError } = await supabase
+        .from('call_rooms')
+        .update({
+          status: 'ended',
+          ended_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', booking.call_rooms.id)
+
+      if (roomUpdateError) {
+        console.error('Error updating room status:', roomUpdateError)
+      }
+    }
+
     // Update booking status to completed
     const { error: updateError } = await supabase
       .from('call_bookings')
@@ -483,7 +754,6 @@ export async function endCall(bookingId: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', bookingId)
-      .eq('creator_id', user.id)
 
     if (updateError) {
       console.error('Error ending call:', updateError)
@@ -493,6 +763,77 @@ export async function endCall(bookingId: string) {
     return { success: true }
   } catch (error) {
     console.error('Error in endCall:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function rejoinCall(bookingId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get booking and room details
+    const { data: booking, error: bookingError } = await supabase
+      .from('call_bookings')
+      .select(`
+        *,
+        call_products!inner(
+          duration_minutes,
+          type,
+          title
+        ),
+        call_rooms!inner(
+          id,
+          daily_room_name,
+          daily_room_url,
+          status
+        )
+      `)
+      .eq('id', bookingId)
+      .eq('creator_id', user.id)
+      .single()
+
+    if (bookingError || !booking) {
+      return { error: 'Booking not found' }
+    }
+
+    if (!booking.call_rooms || booking.call_rooms.status !== 'active') {
+      return { error: 'Call room is not active' }
+    }
+
+    // Create new token for rejoining
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + booking.call_products.duration_minutes + 30)
+
+    try {
+      const creatorToken = await dailyService.createMeetingToken(booking.call_rooms.daily_room_name, {
+        user_id: user.id,
+        user_name: 'クリエイター',
+        is_owner: true,
+        exp: Math.floor(expiresAt.getTime() / 1000)
+      })
+
+      // 埋め込みページのURLを構築
+      const embedUrl = `/call/${booking.call_rooms.id}?url=${encodeURIComponent(booking.call_rooms.daily_room_url)}&t=${creatorToken}&duration=${booking.call_products.duration_minutes}&booking=${bookingId}`
+
+      return { 
+        roomUrl: `${booking.call_rooms.daily_room_url}?t=${creatorToken}`,
+        embedUrl,
+        roomId: booking.call_rooms.id,
+        success: true 
+      }
+    } catch (error) {
+      console.error('Error creating rejoin token:', error)
+      return { error: 'Failed to create access token' }
+    }
+  } catch (error) {
+    console.error('Error in rejoinCall:', error)
     return { error: 'Internal server error' }
   }
 }
@@ -556,8 +897,89 @@ export async function createCallPlan(data: {
       return { error: 'Unauthorized' }
     }
 
-    // Create call product
+    // Parse and validate time slots
     const now = new Date()
+    let newStartTime: Date, newEndTime: Date
+
+    if (data.type === 'queue') {
+      // For queue type, use today's date with specified times
+      newStartTime = parse(data.startTime, 'HH:mm', new Date())
+      newEndTime = parse(data.endTime, 'HH:mm', new Date())
+      
+      // Set today's date
+      newStartTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+      newEndTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+      
+      // If end time is before start time, assume next day
+      if (isBefore(newEndTime, newStartTime)) {
+        newEndTime.setDate(newEndTime.getDate() + 1)
+      }
+    } else {
+      // For fixed type, calculate availability window
+      newStartTime = parse(data.startTime, 'HH:mm', new Date())
+      newEndTime = parse(data.endTime, 'HH:mm', new Date())
+      
+      // Set today's date
+      newStartTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+      newEndTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+      
+      // If end time is before start time, assume next day
+      if (isBefore(newEndTime, newStartTime)) {
+        newEndTime.setDate(newEndTime.getDate() + 1)
+      }
+    }
+
+    // Check for time conflicts with existing active plans
+    console.log('Checking time conflicts...')
+    const { data: existingPlans, error: checkError } = await supabase
+      .from('call_products')
+      .select(`
+        id, title, type, slot_date, start_time, end_time, 
+        available_from, available_until
+      `)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+
+    if (checkError) {
+      console.error('Error checking existing plans:', checkError)
+      return { error: 'Failed to check existing plans' }
+    }
+
+    // Check for conflicts
+    for (const existingPlan of existingPlans || []) {
+      let existingStart: Date, existingEnd: Date
+
+      if (existingPlan.type === 'queue' && existingPlan.slot_date && existingPlan.start_time && existingPlan.end_time) {
+        // Queue type conflict check
+        existingStart = new Date(`${existingPlan.slot_date}T${existingPlan.start_time}:00`)
+        existingEnd = new Date(`${existingPlan.slot_date}T${existingPlan.end_time}:00`)
+      } else if (existingPlan.type === 'fixed' && existingPlan.available_from && existingPlan.available_until) {
+        // Fixed type conflict check
+        existingStart = new Date(existingPlan.available_from)
+        existingEnd = new Date(existingPlan.available_until)
+      } else {
+        continue // Skip invalid entries
+      }
+
+      // Check if times overlap
+      const hasConflict = (
+        (newStartTime >= existingStart && newStartTime < existingEnd) ||
+        (newEndTime > existingStart && newEndTime <= existingEnd) ||
+        (newStartTime <= existingStart && newEndTime >= existingEnd)
+      )
+
+      if (hasConflict) {
+        const conflictTime = existingPlan.type === 'queue' 
+          ? `${existingPlan.start_time}〜${existingPlan.end_time}`
+          : `${new Date(existingPlan.available_from!).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}〜${new Date(existingPlan.available_until!).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`
+        
+        return { 
+          error: `時間が重複しています。既存のプラン「${existingPlan.title}」(${conflictTime})と重複しています。` 
+        }
+      }
+    }
+
+    // Create call product
     const productData: Record<string, unknown> = {
       creator_id: user.id,
       type: data.type,
@@ -570,29 +992,14 @@ export async function createCallPlan(data: {
 
     // Add type-specific fields
     if (data.type === 'queue') {
-      // For queue type, we need to parse the time and set slot_date
-      const startDate = parse(data.startTime, 'HH:mm', new Date())
-      productData.slot_date = format(startDate, 'yyyy-MM-dd')
+      productData.slot_date = format(newStartTime, 'yyyy-MM-dd')
       productData.start_time = data.startTime
       productData.end_time = data.endTime
       productData.max_participants = 10 // Default max participants
       productData.remaining_slots = 10 // Default remaining slots
     } else {
-      // For fixed type, calculate availability window
-      const startDate = parse(data.startTime, 'HH:mm', new Date())
-      const endDate = parse(data.endTime, 'HH:mm', new Date())
-      
-      // Set today's date
-      startDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
-      endDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
-      
-      // If end time is before start time, assume next day
-      if (isBefore(endDate, startDate)) {
-        endDate.setDate(endDate.getDate() + 1)
-      }
-      
-      productData.available_from = startDate.toISOString()
-      productData.available_until = endDate.toISOString()
+      productData.available_from = newStartTime.toISOString()
+      productData.available_until = newEndTime.toISOString()
     }
 
     const { data: product, error: productError } = await supabase
@@ -618,6 +1025,569 @@ export async function createCallPlan(data: {
     }
   } catch (error) {
     console.error('Error in createCallPlan:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function checkTimeConflict(data: {
+  type: 'queue' | 'fixed'
+  startTime: string
+  endTime: string
+  excludeId?: string  // For editing existing plans
+}) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Parse new time slots
+    const now = new Date()
+    const newStartTime = parse(data.startTime, 'HH:mm', new Date())
+    const newEndTime = parse(data.endTime, 'HH:mm', new Date())
+    
+    // Set today's date
+    newStartTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+    newEndTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    // If end time is before start time, assume next day
+    if (isBefore(newEndTime, newStartTime)) {
+      newEndTime.setDate(newEndTime.getDate() + 1)
+    }
+
+    // Get existing active plans
+    let query = supabase
+      .from('call_products')
+      .select(`
+        id, title, type, slot_date, start_time, end_time, 
+        available_from, available_until
+      `)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+
+    // Exclude current plan if editing
+    if (data.excludeId) {
+      query = query.neq('id', data.excludeId)
+    }
+
+    const { data: existingPlans, error: checkError } = await query
+
+    if (checkError) {
+      return { error: 'Failed to check existing plans' }
+    }
+
+    // Check for conflicts
+    for (const existingPlan of existingPlans || []) {
+      let existingStart: Date, existingEnd: Date
+
+      if (existingPlan.type === 'queue' && existingPlan.slot_date && existingPlan.start_time && existingPlan.end_time) {
+        existingStart = new Date(`${existingPlan.slot_date}T${existingPlan.start_time}:00`)
+        existingEnd = new Date(`${existingPlan.slot_date}T${existingPlan.end_time}:00`)
+      } else if (existingPlan.type === 'fixed' && existingPlan.available_from && existingPlan.available_until) {
+        existingStart = new Date(existingPlan.available_from)
+        existingEnd = new Date(existingPlan.available_until)
+      } else {
+        continue
+      }
+
+      // Check if times overlap
+      const hasConflict = (
+        (newStartTime >= existingStart && newStartTime < existingEnd) ||
+        (newEndTime > existingStart && newEndTime <= existingEnd) ||
+        (newStartTime <= existingStart && newEndTime >= existingEnd)
+      )
+
+      if (hasConflict) {
+        const conflictTime = existingPlan.type === 'queue' 
+          ? `${existingPlan.start_time}〜${existingPlan.end_time}`
+          : `${new Date(existingPlan.available_from!).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}〜${new Date(existingPlan.available_until!).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`
+        
+        return { 
+          hasConflict: true,
+          conflictPlan: {
+            title: existingPlan.title,
+            time: conflictTime
+          }
+        }
+      }
+    }
+
+    return { hasConflict: false }
+  } catch (error) {
+    console.error('Error in checkTimeConflict:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function getWaitingRoomStatus(planId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get plan details
+    const { data: plan, error: planError } = await supabase
+      .from('call_products')
+      .select('id, title, duration_minutes, remaining_slots, max_participants, slot_date, start_time, end_time')
+      .eq('id', planId)
+      .eq('creator_id', user.id)
+      .single()
+
+    if (planError || !plan) {
+      return { error: 'Plan not found' }
+    }
+
+    // Get queue participants with profiles using JOIN
+    const { data: queueData, error: queueError } = await supabase
+      .from('queue_participants')
+      .select(`
+        *,
+        profiles!user_id(
+          id,
+          display_name,
+          avatar_url
+        )
+      `)
+      .eq('plan_id', planId)
+      .order('position', { ascending: true })
+
+    if (queueError) {
+      console.error('Error fetching queue:', queueError)
+      return { error: 'Failed to fetch queue' }
+    }
+
+    // Transform the data to match expected structure
+    const queue = queueData?.map(participant => ({
+      ...participant,
+      user_profile: participant.profiles || {
+        display_name: null,
+        avatar_url: null
+      }
+    })) || []
+
+    // Get creator status
+    const { data: statusData } = await supabase
+      .from('creator_status')
+      .select('status')
+      .eq('creator_id', user.id)
+      .eq('plan_id', planId)
+      .single()
+
+    const creator_status = statusData?.status || 'offline'
+
+    // Get current call with participant and profile data using nested JOINs
+    const { data: currentCallData, error: callError } = await supabase
+      .from('current_queue_calls')
+      .select(`
+        *,
+        queue_participants!participant_id(
+          *,
+          profiles!user_id(
+            id,
+            display_name,
+            avatar_url
+          )
+        )
+      `)
+      .eq('plan_id', planId)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+      .single()
+
+    let current_call = null
+    if (currentCallData && !callError && currentCallData.queue_participants) {
+      current_call = {
+        id: currentCallData.id,
+        participant: {
+          ...currentCallData.queue_participants,
+          user_profile: currentCallData.queue_participants.profiles || { 
+            display_name: null, 
+            avatar_url: null 
+          }
+        },
+        started_at: currentCallData.started_at,
+        ends_at: currentCallData.ends_at
+      }
+    }
+
+    return {
+      status: {
+        plan,
+        queue,
+        creator_status,
+        current_call
+      }
+    }
+  } catch (error) {
+    console.error('Error in getWaitingRoomStatus:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function updateCreatorStatus(planId: string, status: 'waiting' | 'break') {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Verify plan belongs to creator
+    const { data: plan, error: planError } = await supabase
+      .from('call_products')
+      .select('id')
+      .eq('id', planId)
+      .eq('creator_id', user.id)
+      .single()
+
+    if (planError || !plan) {
+      return { error: 'Plan not found' }
+    }
+
+    // Upsert creator status
+    const { error: statusError } = await supabase
+      .from('creator_status')
+      .upsert({
+        creator_id: user.id,
+        plan_id: planId,
+        status,
+        last_updated: new Date().toISOString()
+      }, {
+        onConflict: 'creator_id,plan_id'
+      })
+
+    if (statusError) {
+      console.error('Error updating creator status:', statusError)
+      return { error: 'Failed to update status' }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error in updateCreatorStatus:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function startQueueCall(planId: string, participantId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get plan details
+    const { data: plan, error: planError } = await supabase
+      .from('call_products')
+      .select('duration_minutes, title')
+      .eq('id', planId)
+      .eq('creator_id', user.id)
+      .single()
+
+    if (planError || !plan) {
+      return { error: 'Plan not found' }
+    }
+
+    // Get participant details
+    const { data: participant, error: participantError } = await supabase
+      .from('queue_participants')
+      .select('*')
+      .eq('id', participantId)
+      .eq('plan_id', planId)
+      .eq('status', 'waiting')
+      .single()
+
+    if (participantError || !participant) {
+      return { error: 'Participant not found' }
+    }
+
+    // Create Daily.co room
+    const roomName = `queue-${planId.substring(0, 8)}-${participant.position}-${Date.now()}`
+    const duration = plan.duration_minutes
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + duration + 5) // Add 5min buffer
+
+    try {
+      const dailyRoom = await dailyService.createRoom({
+        name: roomName,
+        privacy: 'private',
+        properties: {
+          max_participants: 2,
+          enable_recording: false,
+          enable_chat: true,
+          enable_screenshare: true,
+          exp: Math.floor(expiresAt.getTime() / 1000),
+          lang: 'ja'
+        }
+      })
+
+      // Create current queue call record
+      const callEndsAt = new Date()
+      callEndsAt.setMinutes(callEndsAt.getMinutes() + duration)
+
+      const { data: currentCall, error: callError } = await supabase
+        .from('current_queue_calls')
+        .insert({
+          plan_id: planId,
+          creator_id: user.id,
+          participant_id: participantId,
+          daily_room_name: roomName,
+          daily_room_url: dailyRoom.url,
+          ends_at: callEndsAt.toISOString()
+        })
+        .select()
+        .single()
+
+      if (callError) {
+        // Rollback: Delete Daily.co room
+        await dailyService.deleteRoom(roomName).catch(console.error)
+        console.error('Error creating current call:', callError)
+        return { error: 'Failed to create call session' }
+      }
+
+      // Update participant status to in_call
+      const { error: updateError } = await supabase
+        .from('queue_participants')
+        .update({
+          status: 'in_call',
+          call_started_at: new Date().toISOString()
+        })
+        .eq('id', participantId)
+
+      if (updateError) {
+        console.error('Error updating participant status:', updateError)
+      }
+
+      // Update creator status to in_call
+      await supabase
+        .from('creator_status')
+        .upsert({
+          creator_id: user.id,
+          plan_id: planId,
+          status: 'in_call',
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'creator_id,plan_id'
+        })
+
+      // Create creator token
+      const creatorToken = await dailyService.createMeetingToken(roomName, {
+        user_id: user.id,
+        user_name: 'クリエイター',
+        is_owner: true,
+        exp: Math.floor(expiresAt.getTime() / 1000)
+      })
+
+      // Build embed URL for queue call
+      const embedUrl = `/call/${currentCall.id}?url=${encodeURIComponent(dailyRoom.url)}&t=${creatorToken}&duration=${duration}&booking=queue-${participantId}&queue=true&planId=${planId}`
+
+      return {
+        roomUrl: `${dailyRoom.url}?t=${creatorToken}`,
+        embedUrl,
+        callId: currentCall.id,
+        success: true
+      }
+    } catch (error) {
+      console.error('Error creating Daily.co room:', error)
+      return { error: 'Failed to create video room' }
+    }
+  } catch (error) {
+    console.error('Error in startQueueCall:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function endQueueCall(planId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get current active call
+    const { data: currentCall, error: callError } = await supabase
+      .from('current_queue_calls')
+      .select('*')
+      .eq('plan_id', planId)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+      .single()
+
+    if (callError || !currentCall) {
+      return { error: 'No active call found' }
+    }
+
+    // Delete Daily.co room
+    try {
+      await dailyService.deleteRoom(currentCall.daily_room_name)
+    } catch (error) {
+      console.error('Error deleting Daily.co room:', error)
+      // Continue even if deletion fails
+    }
+
+    // Update current call status to ended
+    await supabase
+      .from('current_queue_calls')
+      .update({ status: 'ended' })
+      .eq('id', currentCall.id)
+
+    // Update participant status to completed
+    await supabase
+      .from('queue_participants')
+      .update({
+        status: 'completed',
+        call_ended_at: new Date().toISOString()
+      })
+      .eq('id', currentCall.participant_id)
+
+    // Update creator status to break (休憩中)
+    await supabase
+      .from('creator_status')
+      .upsert({
+        creator_id: user.id,
+        plan_id: planId,
+        status: 'break',
+        last_updated: new Date().toISOString()
+      }, {
+        onConflict: 'creator_id,plan_id'
+      })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error in endQueueCall:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function addTestParticipant(planId: string, displayName: string = 'テストユーザー') {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Ensure user profile exists
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        display_name: displayName,
+        avatar_url: null
+      }, {
+        onConflict: 'id'
+      })
+
+    // Get next position in queue
+    const { data: lastParticipant } = await supabase
+      .from('queue_participants')
+      .select('position')
+      .eq('plan_id', planId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .single()
+
+    const nextPosition = (lastParticipant?.position || 0) + 1
+
+    // Create test participant (using creator's user_id for testing)
+    const { error: insertError } = await supabase
+      .from('queue_participants')
+      .insert({
+        plan_id: planId,
+        user_id: user.id, // Using creator as test participant
+        position: nextPosition,
+        status: 'waiting'
+      })
+
+    if (insertError) {
+      console.error('Error adding test participant:', insertError)
+      return { error: 'Failed to add test participant' }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error in addTestParticipant:', error)
+    return { error: 'Internal server error' }
+  }
+}
+
+export async function rejoinQueueCall(planId: string, currentCallId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // Get current call details
+    const { data: currentCall, error: callError } = await supabase
+      .from('current_queue_calls')
+      .select('*')
+      .eq('id', currentCallId)
+      .eq('creator_id', user.id)
+      .eq('status', 'active')
+      .single()
+
+    if (callError || !currentCall) {
+      return { error: 'Active call not found' }
+    }
+
+    // Get plan details for duration
+    const { data: plan, error: planError } = await supabase
+      .from('call_products')
+      .select('duration_minutes')
+      .eq('id', planId)
+      .single()
+
+    if (planError || !plan) {
+      return { error: 'Plan not found' }
+    }
+
+    // Create new token for rejoining
+    const expiresAt = new Date(currentCall.ends_at)
+    const creatorToken = await dailyService.createMeetingToken(currentCall.daily_room_name, {
+      user_id: user.id,
+      user_name: 'クリエイター',
+      is_owner: true,
+      exp: Math.floor(expiresAt.getTime() / 1000)
+    })
+
+    // Build embed URL for rejoining
+    const embedUrl = `/call/${currentCall.id}?url=${encodeURIComponent(currentCall.daily_room_url)}&t=${creatorToken}&duration=${plan.duration_minutes}&booking=queue-${currentCall.participant_id}&queue=true&planId=${planId}`
+
+    return {
+      roomUrl: `${currentCall.daily_room_url}?t=${creatorToken}`,
+      embedUrl,
+      callId: currentCall.id,
+      success: true
+    }
+  } catch (error) {
+    console.error('Error in rejoinQueueCall:', error)
     return { error: 'Internal server error' }
   }
 }

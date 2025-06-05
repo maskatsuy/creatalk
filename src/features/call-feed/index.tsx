@@ -2,7 +2,8 @@ import React from 'react';
 import CallProductFeedLayout from './components/CallProductFeedLayout';
 import type { Product } from './components/CallProductCard'; // Product型をインポート
 import { formatDateTime } from '@/lib/utils'; // formatDateTime をインポート
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClientWithCookies } from '@/lib/supabase-server';
+import { cookies } from 'next/headers';
 
 // ダミーデータをここに移動 (src/app/page.tsx から)
 const followedCreators: Product[] = [
@@ -190,7 +191,8 @@ const followedCreators: Product[] = [
 
 // CallFeedFeature のエントリーポイント (サーバーコンポーネント)
 export default async function CallFeedFeature() {
-  const supabase = await createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClientWithCookies(cookieStore);
   
   // データベースから商品データを取得
   const { data: dbProducts, error } = await supabase

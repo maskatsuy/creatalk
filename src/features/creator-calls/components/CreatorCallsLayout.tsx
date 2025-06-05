@@ -9,6 +9,7 @@ import { ReservationCard } from './ReservationCard'
 import { CreateCallPlanDialog } from './CreateCallPlanDialog'
 import { CallPlanCard } from './CallPlanCard'
 import { ActiveCallAlert } from './ActiveCallAlert'
+import { Pagination } from '@/components/ui/pagination'
 import { 
   getCreatorReservations, 
   getCreatorCallProducts,
@@ -28,12 +29,17 @@ export function CreatorCallsLayout() {
       type: string
       duration_minutes: number
     }
-    room_url?: string
+    call_rooms?: {
+      id: string
+      daily_room_url: string
+    } | null
   }>>([])
   const [filters, setFilters] = useState<Filters>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'plans' | 'reservations'>('plans')
+  const [activeTab, setActiveTab] = useState<'active-plans' | 'completed-plans' | 'reservations'>('active-plans')
+  const [currentActivePage, setCurrentActivePage] = useState(1)
+  const [currentCompletedPage, setCurrentCompletedPage] = useState(1)
 
   const loadData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
@@ -43,9 +49,9 @@ export function CreatorCallsLayout() {
     }
 
     try {
-      const [reservationsResult, productsResult, activeBookingsResult] = await Promise.all([
+      const [reservationsResult, allProductsResult, activeBookingsResult] = await Promise.all([
         getCreatorReservations(filters),
-        getCreatorCallProducts(),
+        getCreatorCallProducts({ page: 1, limit: 1000 }), // Get all products for now, we'll filter client-side
         getActiveCallBookings()
       ])
 
@@ -55,10 +61,10 @@ export function CreatorCallsLayout() {
         setReservations(reservationsResult.reservations || [])
       }
 
-      if (productsResult.error) {
-        toast.error(productsResult.error)
+      if (allProductsResult.error) {
+        toast.error(allProductsResult.error)
       } else {
-        setProducts(productsResult.products || [])
+        setProducts(allProductsResult.products || [])
       }
 
       if (activeBookingsResult.error) {
@@ -75,6 +81,25 @@ export function CreatorCallsLayout() {
     }
   }, [filters])
 
+  // Page change handlers
+  const handleActivePageChange = (page: number) => {
+    setCurrentActivePage(page)
+  }
+
+  const handleCompletedPageChange = (page: number) => {
+    setCurrentCompletedPage(page)
+  }
+
+  // Reset page when switching tabs
+  const handleTabChange = (tab: 'active-plans' | 'completed-plans' | 'reservations') => {
+    setActiveTab(tab)
+    if (tab === 'active-plans') {
+      setCurrentActivePage(1)
+    } else if (tab === 'completed-plans') {
+      setCurrentCompletedPage(1)
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [loadData])
@@ -89,6 +114,95 @@ export function CreatorCallsLayout() {
 
   const handleReservationUpdate = () => {
     loadData(true)
+  }
+
+  // プランのステータスを判定する関数
+  const isActivePlan = (product: CallProduct) => {
+    const now = new Date()
+    
+    if (product.type === 'queue') {
+      // キュータイプの場合
+      if (product.slot_date && product.end_time) {
+        // 特定の日付の場合、その日の終了時間をチェック
+        const slotDate = new Date(product.slot_date)
+        const [hours, minutes] = product.end_time.split(':').map(Number)
+        const endDateTime = new Date(slotDate)
+        endDateTime.setHours(hours, minutes, 0, 0)
+        
+        return endDateTime > now
+      } else if (product.end_time) {
+        // 今日の終了時間をチェック（日付指定がない場合）
+        const [hours, minutes] = product.end_time.split(':').map(Number)
+        const endTime = new Date()
+        endTime.setHours(hours, minutes, 0, 0)
+        
+        // 今日の終了時間が過ぎていれば終了
+        return endTime > now
+      }
+      return true
+    } else {
+      // 固定スロットタイプの場合、より厳密な判定
+      
+      // 1. 予約受付期間をチェック
+      if (product.available_until) {
+        const availableUntil = new Date(product.available_until)
+        if (availableUntil < now) {
+          return false // 予約受付期間が終了
+        }
+      }
+      
+      // 2. 残り予約枠をチェック
+      if (product.remaining_slots !== null && product.remaining_slots !== undefined) {
+        if (product.remaining_slots <= 0) {
+          return false // 予約枠が満席
+        }
+      }
+      
+      // 3. 予約開始日時をチェック
+      if (product.available_from) {
+        const availableFrom = new Date(product.available_from)
+        if (availableFrom > now) {
+          return true // まだ予約開始前だが、アクティブとみなす
+        }
+      }
+      
+      // 4. フォールバック：予約受付期間の情報がない場合は作成日ベースで判定
+      if (!product.available_until && !product.available_from) {
+        const createdAt = new Date(product.created_at)
+        const thirtyDaysFromCreation = new Date(createdAt)
+        thirtyDaysFromCreation.setDate(thirtyDaysFromCreation.getDate() + 30)
+        return thirtyDaysFromCreation > now
+      }
+      
+      return true
+    }
+  }
+
+  // プランを分類
+  const activePlans = products.filter(isActivePlan)
+  const completedPlans = products.filter(product => !isActivePlan(product))
+
+  // Client-side pagination
+  const itemsPerPage = 10
+  const getPageData = (items: CallProduct[], currentPage: number) => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return items.slice(startIndex, endIndex)
+  }
+
+  const paginatedActivePlans = getPageData(activePlans, currentActivePage)
+  const paginatedCompletedPlans = getPageData(completedPlans, currentCompletedPage)
+
+  const activePagination = {
+    currentPage: currentActivePage,
+    totalPages: Math.ceil(activePlans.length / itemsPerPage),
+    totalItems: activePlans.length
+  }
+
+  const completedPagination = {
+    currentPage: currentCompletedPage,
+    totalPages: Math.ceil(completedPlans.length / itemsPerPage),
+    totalItems: completedPlans.length
   }
 
   if (loading) {
@@ -200,17 +314,27 @@ export function CreatorCallsLayout() {
       <div className="bg-white dark:bg-gray-900 border rounded-lg mb-6">
         <div className="flex border-b">
           <button
-            onClick={() => setActiveTab('plans')}
+            onClick={() => handleTabChange('active-plans')}
             className={`px-6 py-3 font-medium text-sm transition-colors ${
-              activeTab === 'plans'
+              activeTab === 'active-plans'
                 ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            作成したプラン ({products.length}件)
+            進行中のプラン ({activePlans.length}件)
           </button>
           <button
-            onClick={() => setActiveTab('reservations')}
+            onClick={() => handleTabChange('completed-plans')}
+            className={`px-6 py-3 font-medium text-sm transition-colors ${
+              activeTab === 'completed-plans'
+                ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            終了したプラン ({completedPlans.length}件)
+          </button>
+          <button
+            onClick={() => handleTabChange('reservations')}
             className={`px-6 py-3 font-medium text-sm transition-colors ${
               activeTab === 'reservations'
                 ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
@@ -224,10 +348,10 @@ export function CreatorCallsLayout() {
 
       {/* Content */}
       <div className="space-y-6">
-        {activeTab === 'plans' ? (
-          // Plans List
+        {activeTab === 'active-plans' ? (
+          // Active Plans List
           <div>
-            {products.length === 0 ? (
+            {paginatedActivePlans.length === 0 && activePlans.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-4">
                   <svg 
@@ -245,22 +369,79 @@ export function CreatorCallsLayout() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  プランがありません
+                  進行中のプランがありません
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400">
                   右上の「プラン作成」ボタンから新しいプランを作成してください
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {products.map((product) => (
-                  <CallPlanCard
-                    key={product.id}
-                    product={product}
-                    onUpdate={handleRefresh}
-                  />
-                ))}
+              <>
+                <div className="grid gap-4">
+                  {paginatedActivePlans.map((product) => (
+                    <CallPlanCard
+                      key={product.id}
+                      product={product}
+                      onUpdate={handleRefresh}
+                    />
+                  ))}
+                </div>
+                <Pagination
+                  currentPage={activePagination.currentPage}
+                  totalPages={activePagination.totalPages}
+                  onPageChange={handleActivePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={activePagination.totalItems}
+                />
+              </>
+            )}
+          </div>
+        ) : activeTab === 'completed-plans' ? (
+          // Completed Plans List
+          <div>
+            {paginatedCompletedPlans.length === 0 && completedPlans.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <svg 
+                    className="mx-auto h-12 w-12" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" 
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  終了したプランがありません
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400">
+                  プランが終了すると、ここに表示されます
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="grid gap-4">
+                  {paginatedCompletedPlans.map((product) => (
+                    <CallPlanCard
+                      key={product.id}
+                      product={product}
+                      onUpdate={handleRefresh}
+                    />
+                  ))}
+                </div>
+                <Pagination
+                  currentPage={completedPagination.currentPage}
+                  totalPages={completedPagination.totalPages}
+                  onPageChange={handleCompletedPageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={completedPagination.totalItems}
+                />
+              </>
             )}
           </div>
         ) : (

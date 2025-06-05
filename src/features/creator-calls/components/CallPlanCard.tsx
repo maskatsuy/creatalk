@@ -88,6 +88,54 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
     }
   }
 
+  const formatScheduleInfo = () => {
+    if (product.type === 'queue' && product.slot_date && product.start_time && product.end_time) {
+      const date = new Date(product.slot_date).toLocaleDateString('ja-JP', {
+        month: 'short',
+        day: 'numeric',
+        weekday: 'short'
+      })
+      return `${date} ${product.start_time}〜${product.end_time}`
+    }
+    
+    if (product.type === 'fixed' && product.available_from && product.available_until) {
+      const from = new Date(product.available_from)
+      const until = new Date(product.available_until)
+      
+      // Same day
+      if (from.toDateString() === until.toDateString()) {
+        const date = from.toLocaleDateString('ja-JP', {
+          month: 'short',
+          day: 'numeric',
+          weekday: 'short'
+        })
+        const timeFrom = from.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+        const timeUntil = until.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+        return `${date} ${timeFrom}〜${timeUntil}`
+      } else {
+        // Different days
+        const dateFrom = from.toLocaleDateString('ja-JP', {
+          month: 'short',
+          day: 'numeric'
+        })
+        const dateUntil = until.toLocaleDateString('ja-JP', {
+          month: 'short',
+          day: 'numeric'
+        })
+        return `${dateFrom}〜${dateUntil}`
+      }
+    }
+    
+    return '日時未設定'
+  }
+
+  const getAvailabilityInfo = () => {
+    if (product.type === 'queue' && product.remaining_slots !== undefined && product.max_participants !== undefined) {
+      return `${product.remaining_slots}/${product.max_participants}枠`
+    }
+    return '-件'
+  }
+
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="pb-3">
@@ -130,6 +178,21 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
       </CardHeader>
       
       <CardContent>
+        {/* Schedule Information */}
+        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-blue-600" />
+            <div>
+              <div className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                {formatScheduleInfo()}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {product.type === 'queue' ? '開催日時' : '利用可能時間'}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="flex items-center gap-2">
             <span className="h-4 w-4 text-muted-foreground font-bold">¥</span>
@@ -155,9 +218,11 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
             <Users className="h-4 w-4 text-muted-foreground" />
             <div>
               <div className="text-sm font-medium">
-                -件
+                {getAvailabilityInfo()}
               </div>
-              <div className="text-xs text-muted-foreground">予約数</div>
+              <div className="text-xs text-muted-foreground">
+                {product.type === 'queue' ? '空き枠' : '予約数'}
+              </div>
             </div>
           </div>
           

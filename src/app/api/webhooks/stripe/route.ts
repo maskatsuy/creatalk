@@ -1,10 +1,11 @@
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClientWithCookies } from '@/lib/supabase-server';
+import { cookies } from 'next/headers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-05-28.basil',
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = createServerClient();
+  const cookieStore = await cookies();
+  const supabase = createServerClientWithCookies(cookieStore);
 
   try {
     switch (event.type) {

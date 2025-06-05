@@ -6,6 +6,7 @@ export interface CallReservation {
   fixed_slot_id: string | null
   start_time: string
   end_time: string
+  scheduled_start?: string
   created_at: string
   updated_at: string
   // Joined data
@@ -28,14 +29,22 @@ export interface CallReservation {
     duration: number
     is_recording_enabled: boolean
   }
+  product?: {
+    title: string
+    type: string
+    duration: number
+    price: number
+    description?: string | null
+  }
   status?: {
-    status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
+    status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'in_progress'
     created_at: string
   }
   call_room?: {
     daily_room_url: string
     recording_url: string | null
   }
+  room_url?: string
 }
 
 export interface CallProduct {
@@ -49,6 +58,14 @@ export interface CallProduct {
   recording_enabled: boolean
   created_at: string
   updated_at: string
+  // Schedule information
+  slot_date?: string | null  // For queue type
+  start_time?: string | null  // Time format HH:mm
+  end_time?: string | null    // Time format HH:mm
+  available_from?: string | null  // For fixed type - ISO datetime
+  available_until?: string | null  // For fixed type - ISO datetime
+  max_participants?: number | null
+  remaining_slots?: number | null
 }
 
 export interface CallStats {
@@ -67,4 +84,13 @@ export interface CallFilters {
   dateFrom?: string
   dateTo?: string
   productId?: string
+}
+
+export interface Pagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
 }

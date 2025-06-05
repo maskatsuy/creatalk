@@ -72,7 +72,7 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
   }
 
   const canStartCall = () => {
-    return reservation.status === 'confirmed' && 
+    return reservation.status?.status === 'confirmed' && 
            reservation.scheduled_start && 
            new Date(reservation.scheduled_start) <= new Date()
   }
@@ -169,12 +169,12 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
         {/* Schedule Info */}
         <div className="flex items-center gap-2 text-sm">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span>開始予定: {formatDateTime(reservation.scheduled_start)}</span>
+          <span>開始予定: {reservation.scheduled_start ? formatDateTime(reservation.scheduled_start) : '未定'}</span>
         </div>
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 pt-2">
-          {reservation.status === 'pending' && (
+          {reservation.status?.status === 'pending' && (
             <>
               <Button 
                 size="sm" 
@@ -206,7 +206,7 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
             </Button>
           )}
           
-          {reservation.status === 'in_progress' && reservation.room_url && (
+          {reservation.status?.status === 'in_progress' && reservation.room_url && (
             <Button 
               size="sm"
               onClick={() => window.open(reservation.room_url!, '_blank')}
@@ -217,7 +217,7 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
             </Button>
           )}
           
-          {reservation.status === 'in_progress' && (
+          {reservation.status?.status === 'in_progress' && (
             <Button 
               size="sm" 
               variant="outline"
@@ -228,11 +228,11 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
             </Button>
           )}
           
-          {reservation.status === 'completed' && reservation.recording_url && (
+          {reservation.status?.status === 'completed' && reservation.call_room?.recording_url && (
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => window.open(reservation.recording_url!, '_blank')}
+              onClick={() => reservation.call_room?.recording_url && window.open(reservation.call_room.recording_url, '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-1" />
               録画を見る

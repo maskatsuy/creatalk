@@ -29,7 +29,10 @@ export async function getCreatorApplications() {
       updated_at,
       reviewed_by,
       admin_feedback,
-      profiles!creator_applications_user_id_fkey (
+      message,
+      terms_agreed,
+      age_verified,
+      profiles!user_id (
         email
       )
     `)
@@ -40,7 +43,13 @@ export async function getCreatorApplications() {
     throw new Error('申請情報の取得に失敗しました')
   }
 
-  return data
+  // Transform the data to ensure profiles is a single object, not an array
+  const transformedData = data?.map(app => ({
+    ...app,
+    profiles: Array.isArray(app.profiles) ? app.profiles[0] || null : app.profiles
+  }))
+
+  return transformedData
 }
 
 export async function approveApplication(applicationId: string) {
