@@ -462,6 +462,22 @@ export default function CallPage() {
     if (event && typeof event === 'object') {
       console.error('Error keys:', Object.keys(event))
       console.error('Error details:', JSON.stringify(event, null, 2))
+      
+      // 通話が終了している場合の特別な処理
+      if (event.errorMsg?.includes('meeting has ended') || 
+          event.errorMsg?.includes('room not found')) {
+        toast.error('通話は既に終了しています')
+        
+        setTimeout(() => {
+          // キュー通話の場合は待機室に戻る、それ以外は通話一覧に戻る
+          if (isQueueCall && planId) {
+            router.push(`/creator/waiting-room/${planId}`)
+          } else {
+            router.push('/creator/calls')
+          }
+        }, 2000)
+        return
+      }
     }
     toast.error('通話エラーが発生しました')
   }
@@ -506,14 +522,16 @@ export default function CallPage() {
 
     // 通話終了処理
     if (isQueueCall && planId) {
-      // キュー通話の場合はendQueueCallを使用
+      // キューベースの通話
+      // TODO: ユーザーとクリエイターで処理を分ける必要があるかもしれない
+      // 現在はクリエイター側の処理のみ
       const result = await endQueueCall(planId)
       if (result.error) {
         toast.error('通話の終了処理に失敗しました')
       } else {
         toast.success('通話を終了しました')
         // 待機室に戻る
-        router.push(`/waiting-room/${planId}`)
+        router.push(`/creator/waiting-room/${planId}`)
         return
       }
     } else if (bookingId) {
@@ -592,7 +610,7 @@ export default function CallPage() {
           {isQueueCall && planId && (
             <Button
               variant="outline"
-              onClick={() => router.push(`/waiting-room/${planId}`)}
+              onClick={() => router.push(`/creator/waiting-room/${planId}`)}
               className="gap-2"
             >
               待機室に戻る

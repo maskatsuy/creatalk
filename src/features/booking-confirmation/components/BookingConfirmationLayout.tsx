@@ -11,27 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { Clock, Calendar, Video, User as UserIcon, CreditCard, AlertCircle } from 'lucide-react'
 import { useStripeCheckout } from '../hooks/useStripeCheckout'
 import type { User } from '@supabase/supabase-js'
-
-interface CallProduct {
-  id: string
-  title: string
-  description: string | null
-  price: number
-  duration_minutes: number
-  type: 'queue' | 'fixed'
-  slot_date: string | null
-  start_time: string | null
-  end_time: string | null
-  available_from: string | null
-  available_until: string | null
-  max_participants: number | null
-  remaining_slots: number | null
-  creator_profile: {
-    display_name: string
-    bio: string | null
-    profile_image_url: string | null
-  } | null
-}
+import type { CallProduct } from '../types'
 
 interface BookingConfirmationLayoutProps {
   product: CallProduct

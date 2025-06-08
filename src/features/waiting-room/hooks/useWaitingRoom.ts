@@ -21,9 +21,23 @@ export function useWaitingRoom(planId: string) {
   const fetchStatus = useCallback(async () => {
     try {
       const result = await getWaitingRoomStatus(planId)
+      
+      // resultがundefinedまたはnullの場合の処理
+      if (!result) {
+        console.error('No result from getWaitingRoomStatus')
+        toast.error('データの取得に失敗しました')
+        setLoading(false)
+        return
+      }
+      
       if (result.error) {
-        toast.error(result.error)
-        router.push('/creator/calls')
+        // 認証エラーの場合は通知を出さずにリダイレクト
+        if (result.error === 'Unauthorized') {
+          router.push('/login')
+        } else {
+          toast.error(result.error)
+          router.push('/creator/calls')
+        }
         return
       }
       

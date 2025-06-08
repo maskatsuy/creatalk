@@ -7,8 +7,9 @@ export function HeroSection() {
     <section className="container max-w-6xl mx-auto px-4 py-16">
       <div className="grid lg:grid-cols-2 gap-12 items-center">
         <div className="space-y-6">
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            クリエイターと話そう
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <span className="inline-block">クリエイターと</span>
+            <span className="inline-block">話そう</span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-600">
             好きなクリエイターと1対1のビデオ通話で<br />

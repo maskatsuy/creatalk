@@ -56,7 +56,7 @@ export function ActiveCallAlert({ bookings, onUpdate }: ActiveCallAlertProps) {
         // 先着制プランの場合は待機室に移動
         if (booking.call_products.type === 'queue') {
           const planId = booking.plan_id
-          window.location.href = `/waiting-room/${planId}`
+          window.location.href = `/creator/waiting-room/${planId}`
           return
         } else {
           toast.info('参加者がいません。予約を待機しています。')

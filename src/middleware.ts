@@ -43,7 +43,11 @@ export async function middleware(request: NextRequest) {
   
   console.log('[Middleware] User:', user ? user.id : null)
   console.log('[Middleware] Is Public Path:', isPublicPath)
-  console.log('[Middleware] Error:', error)
+  
+  // 認証セッションがない場合のエラーは通常の動作なのでログを出さない
+  if (error && error.message !== 'Auth session missing!') {
+    console.log('[Middleware] Error:', error)
+  }
 
   // 認証が必要なパスで未ログインの場合
   if (!isPublicPath && (!user || error)) {

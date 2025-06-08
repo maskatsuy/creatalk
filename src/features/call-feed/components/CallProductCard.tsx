@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Users } from 'lucide-react';
 import { createCheckoutSession } from '@/actions/stripe';
 import { toast } from 'sonner';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useAuthContext } from '@/features/auth';
 import { useRouter } from 'next/navigation';
 
 export interface Product {
@@ -29,7 +29,7 @@ export interface Product {
 
 export default function CallProductCard({ product }: { product: Product }) {
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const router = useRouter();
   const isUrgent = product.remainingSlots <= 3 && product.remainingSlots > 0;
   const isSoldOut = product.remainingSlots === 0;

@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useAuthContext } from '@/features/auth'
 import { 
   useWaitingRoom, 
   useCallTimer, 
@@ -21,7 +21,7 @@ export default function WaitingRoomPage() {
   const params = useParams()
   const router = useRouter()
   const planId = params.planId as string
-  const { isAdmin } = useAuth()
+  const { isAdmin } = useAuthContext()
   
   // カスタムフックを使用
   const { status, loading, actionLoading, actions } = useWaitingRoom(planId)

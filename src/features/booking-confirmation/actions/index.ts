@@ -51,6 +51,13 @@ export async function createBookingFromPayment(params: {
 
       const nextPosition = (lastParticipant?.position || 0) + 1
 
+      console.log('[createBookingFromPayment] Creating queue participant:', {
+        plan_id: params.productId,
+        user_id: user.id,
+        position: nextPosition,
+        status: 'waiting'
+      })
+
       const { data: participant, error: participantError } = await supabase
         .from('queue_participants')
         .insert({
@@ -67,6 +74,8 @@ export async function createBookingFromPayment(params: {
         return { error: '予約の作成に失敗しました' }
       }
 
+      console.log('[createBookingFromPayment] Queue participant created:', participant)
+
       // Record payment
       const { error: paymentError } = await supabase
         .from('payments')
@@ -80,7 +89,7 @@ export async function createBookingFromPayment(params: {
         })
 
       if (paymentError) {
-        console.error('Payment record error:', paymentError)
+        console.error('Payment record error:', paymentError.message || paymentError)
         // Don't fail the booking if payment record fails
       }
 

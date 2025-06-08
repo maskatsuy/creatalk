@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { User, AuthChangeEvent, Session, AuthError } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
@@ -14,10 +14,11 @@ export const useAuth = (initialUser: User | null = null) => {
   const [isCreator, setIsCreator] = useState(false)
   const router = useRouter()
   
-  const supabase = createBrowserClient<Database>(
+  // Create supabase client only once using useMemo
+  const supabase = useMemo(() => createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  ), [])
 
   // Check if user is admin or creator
   useEffect(() => {
