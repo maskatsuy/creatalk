@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Users } from 'lucide-react';
 import { createCheckoutSession } from '@/actions/stripe';
 import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 export interface Product {
   id: string;
@@ -27,18 +29,35 @@ export interface Product {
 
 export default function CallProductCard({ product }: { product: Product }) {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
   const isUrgent = product.remainingSlots <= 3 && product.remainingSlots > 0;
   const isSoldOut = product.remainingSlots === 0;
 
   const handleReservation = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     if (product.type === 'queue') {
       // 先着制の場合はStripe決済へ
       setIsLoading(true);
       try {
-        await createCheckoutSession(product.id, product.creatorId);
+        const result = await createCheckoutSession({
+          productId: product.id,
+          userId: user.id,
+          successUrl: `${window.location.origin}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: window.location.href
+        });
+        
+        if (result.error) {
+          toast.error(result.error);
+        }
       } catch (error) {
         console.error('Error creating checkout session:', error);
         toast.error('予約処理中にエラーが発生しました');
+      } finally {
         setIsLoading(false);
       }
     } else {

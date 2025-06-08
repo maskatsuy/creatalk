@@ -112,66 +112,60 @@ export default function WaitingRoomPage() {
           formattedRemainingTime={getRemainingTime()}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6 flex flex-col">
-            {/* Next participant - Order: Mobile=1, Desktop=3 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:items-start">
+          <div className="space-y-6">
+            {/* AutoStart Countdown */}
+            <AutoStartCountdown 
+              countdown={autoStartCountdown}
+              onCancel={cancelCountdown}
+            />
+            
+            {/* Current Call */}
+            <CurrentCallCard 
+              currentCall={status.current_call}
+              timeRemaining={timeRemaining}
+              actionLoading={actionLoading}
+              onEndCall={actions.endCall}
+              onRejoinCall={handleRejoinCall}
+              formatTime={formatTime}
+            />
+            
+            {/* Next participant */}
             {nextParticipant && (
-              <div className="order-1 lg:order-3">
-                <NextParticipantCard
-                  participant={nextParticipant}
-                  actionLoading={actionLoading}
-                  onStartCall={handleStartCall}
-                  onAutoStart={handleAutoStart}
-                />
-              </div>
+              <NextParticipantCard
+                participant={nextParticipant}
+                actionLoading={actionLoading}
+                onStartCall={handleStartCall}
+                onAutoStart={handleAutoStart}
+              />
             )}
             
-            {/* Device Settings - Order: Mobile=2, Desktop=hidden (shown in right column) */}
-            <div className="order-2 lg:hidden">
+            {/* Queue List */}
+            <QueueList 
+              queue={status.queue}
+              nextParticipant={nextParticipant}
+              isAdmin={isAdmin}
+              actionLoading={actionLoading}
+              onAddTestParticipant={actions.addTestParticipant}
+            />
+            
+            {/* Device Settings - Mobile only */}
+            <div className="lg:hidden">
               <DeviceSettingsPanel 
                 deviceSettings={devices.deviceSettings}
                 onUpdateSetting={devices.updateSetting}
               />
             </div>
-            
-            {/* AutoStart - Order: Mobile=3, Desktop=1 */}
-            <div className="order-3 lg:order-1">
-              <AutoStartCountdown 
-                countdown={autoStartCountdown}
-                onCancel={cancelCountdown}
-              />
-            </div>
-            
-            {/* Current Call - Order: Mobile=4, Desktop=2 */}
-            <div className="order-4 lg:order-2">
-              <CurrentCallCard 
-                currentCall={status.current_call}
-                timeRemaining={timeRemaining}
-                actionLoading={actionLoading}
-                onEndCall={actions.endCall}
-                onRejoinCall={handleRejoinCall}
-                formatTime={formatTime}
-              />
-            </div>
-            
-            {/* Queue List - Order: Mobile=5, Desktop=4 */}
-            <div className="order-5 lg:order-4">
-              <QueueList 
-                queue={status.queue}
-                nextParticipant={nextParticipant}
-                isAdmin={isAdmin}
-                actionLoading={actionLoading}
-                onAddTestParticipant={actions.addTestParticipant}
-              />
-            </div>
           </div>
 
           {/* Desktop: Device settings on the right */}
-          <div className="hidden lg:block space-y-6">
-            <DeviceSettingsPanel 
-              deviceSettings={devices.deviceSettings}
-              onUpdateSetting={devices.updateSetting}
-            />
+          <div className="hidden lg:block">
+            <div className="sticky top-8">
+              <DeviceSettingsPanel 
+                deviceSettings={devices.deviceSettings}
+                onUpdateSetting={devices.updateSetting}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -1146,33 +1146,39 @@ export async function getWaitingRoomStatus(planId: string) {
       return { error: 'Plan not found' }
     }
 
-    // Get queue participants with profiles using JOIN
+    // Get queue participants first
     const { data: queueData, error: queueError } = await supabase
       .from('queue_participants')
-      .select(`
-        *,
-        profiles!user_id(
-          id,
-          display_name,
-          avatar_url
-        )
-      `)
+      .select('*')
       .eq('plan_id', planId)
       .order('position', { ascending: true })
+
+    // If we have participants, get their profiles separately
+    let queueWithProfiles = []
+    if (queueData && queueData.length > 0) {
+      const userIds = queueData.map(p => p.user_id)
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds)
+
+      // Merge the data
+      queueWithProfiles = queueData.map(participant => {
+        const profile = profilesData?.find(p => p.id === participant.user_id)
+        return {
+          ...participant,
+          user_profile: profile || { display_name: null, avatar_url: null }
+        }
+      })
+    }
 
     if (queueError) {
       console.error('Error fetching queue:', queueError)
       return { error: 'Failed to fetch queue' }
     }
 
-    // Transform the data to match expected structure
-    const queue = queueData?.map(participant => ({
-      ...participant,
-      user_profile: participant.profiles || {
-        display_name: null,
-        avatar_url: null
-      }
-    })) || []
+    // Use the merged queue data
+    const queue = queueWithProfiles || []
 
     // Get creator status
     const { data: statusData } = await supabase
@@ -1184,38 +1190,45 @@ export async function getWaitingRoomStatus(planId: string) {
 
     const creator_status = statusData?.status || 'offline'
 
-    // Get current call with participant and profile data using nested JOINs
+    // Get current call first
     const { data: currentCallData, error: callError } = await supabase
       .from('current_queue_calls')
-      .select(`
-        *,
-        queue_participants!participant_id(
-          *,
-          profiles!user_id(
-            id,
-            display_name,
-            avatar_url
-          )
-        )
-      `)
+      .select('*')
       .eq('plan_id', planId)
       .eq('creator_id', user.id)
       .eq('status', 'active')
       .single()
 
     let current_call = null
-    if (currentCallData && !callError && currentCallData.queue_participants) {
-      current_call = {
-        id: currentCallData.id,
-        participant: {
-          ...currentCallData.queue_participants,
-          user_profile: currentCallData.queue_participants.profiles || { 
-            display_name: null, 
-            avatar_url: null 
-          }
-        },
-        started_at: currentCallData.started_at,
-        ends_at: currentCallData.ends_at
+    if (currentCallData && !callError) {
+      // Get participant and profile data separately
+      const { data: participantData } = await supabase
+        .from('queue_participants')
+        .select('*')
+        .eq('id', currentCallData.participant_id)
+        .single()
+
+      if (participantData) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .eq('id', participantData.user_id)
+          .single()
+
+        current_call = {
+          id: currentCallData.id,
+          participant: {
+            ...participantData,
+            user_profile: profileData || { 
+              display_name: null, 
+              avatar_url: null 
+            }
+          },
+          started_at: currentCallData.started_at,
+          ends_at: currentCallData.ends_at,
+          daily_room_name: currentCallData.daily_room_name,
+          daily_room_url: currentCallData.daily_room_url
+        }
       }
     }
 

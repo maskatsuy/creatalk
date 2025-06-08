@@ -136,7 +136,7 @@ export function ActiveCallPlans({ products }: ActiveCallPlansProps) {
               className="w-full"
               disabled={!isAvailable(product)}
             >
-              <Link href={`/waiting-room/${product.id}`}>
+              <Link href={`/booking/${product.id}`}>
                 {isAvailable(product) ? '予約する' : '予約終了'}
               </Link>
             </Button>
