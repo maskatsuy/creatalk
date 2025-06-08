@@ -56,13 +56,22 @@ export const useAuth = (initialUser: User | null = null) => {
     if (!initialUser) {
       const getUser = async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser()
-          setUser(user)
-        } catch (error: unknown) {
-          if (error instanceof AuthError) {
-            console.error('Error loading user:', error.message)
-            toast.error('ユーザー情報の取得に失敗しました')
+          const { data: { user }, error } = await supabase.auth.getUser()
+          if (error) {
+            // 認証セッションがない、またはリフレッシュトークンエラーの場合は静かに処理
+            if (error.message.includes('Refresh Token') || error.message === 'Auth session missing!') {
+              // 正常な未ログイン状態として扱う
+              setUser(null)
+            } else {
+              // それ以外の本当のエラーのみログ出力
+              console.error('Error loading user:', error.message)
+              toast.error('ユーザー情報の取得に失敗しました')
+            }
+          } else {
+            setUser(user)
           }
+        } catch (error: unknown) {
+          console.error('Unexpected error in getUser:', error)
         } finally {
           setLoading(false)
         }
@@ -70,11 +79,17 @@ export const useAuth = (initialUser: User | null = null) => {
       getUser()
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null)
-      // if (session?.user) {
-      //   router.refresh()
-      // }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      // リフレッシュトークンエラーの場合
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.error('Token refresh failed')
+        setUser(null)
+        // エラーメッセージは表示しない（ユーザーは既にログアウト状態）
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      } else {
+        setUser(session?.user ?? null)
+      }
     })
 
     return () => {
@@ -113,7 +128,11 @@ export const useAuth = (initialUser: User | null = null) => {
       toast.success('確認メールを送信しました')
     } catch (error: unknown) {
       if (error instanceof AuthError) {
-        console.error('Error signing up:', error.message)
+        console.error('Error signing up:', error.message, error)
+        toast.error(`アカウント作成に失敗しました: ${error.message}`)
+        throw error
+      } else {
+        console.error('Unknown error signing up:', error)
         toast.error('アカウント作成に失敗しました')
         throw error
       }
@@ -125,8 +144,7 @@ export const useAuth = (initialUser: User | null = null) => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       toast.success('ログアウトしました')
-      router.push('/login')
-      // router.refresh() // ログアウト後はページ遷移するので不要かもしれない
+      router.push('/')  // ランディングページに戻す
     } catch (error: unknown) {
       if (error instanceof AuthError) {
         console.error('Error signing out:', error.message)

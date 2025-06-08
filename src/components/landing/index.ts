@@ -1,0 +1,6 @@
+export { HeroSection } from './HeroSection'
+export { FeaturesSection } from './FeaturesSection'
+export { UserStepsSection } from './UserStepsSection'
+export { CreatorSection } from './CreatorSection'
+export { CTASection } from './CTASection'
+export { Footer } from './Footer'

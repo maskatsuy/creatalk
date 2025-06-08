@@ -60,3 +60,36 @@ Two types of products:
 - **Fixed Slots**: Specific time bookings
 
 Video calls include: video/audio controls, screen sharing, chat (fan chat-only mode), and optional recording.
+
+## Component Architecture Guidelines
+
+### Device Preview Component Pattern
+The device preview functionality has been refactored following these principles:
+
+1. **Separation of Concerns**:
+   - `VideoPreview`: Handles video display and permission states
+   - `MediaControls`: Manages video/audio toggle buttons
+   - `AudioLevelIndicator`: Visual audio level feedback
+   - `AudioRecorder`: Audio recording and playback for testing
+   - `DeviceSelector`: Device selection dropdowns
+
+2. **Custom Hooks Pattern**:
+   - `useMediaDevices`: Device enumeration and selection state
+   - `useMediaStream`: Stream lifecycle management
+   - `useAudioLevel`: Real-time audio level monitoring
+   - `useAudioRecorder`: Recording functionality
+
+3. **Performance Optimization**:
+   - Use `useCallback` for event handlers to prevent unnecessary re-renders
+   - Avoid `eslint-disable` comments by properly managing dependencies
+   - Use `useRef` for initialization flags instead of empty dependency arrays
+
+4. **Error Handling**:
+   - Specific error messages based on `DOMException` types
+   - User-friendly error notifications with actionable guidance
+
+### Best Practices
+1. **Avoid eslint-disable**: Always prefer proper dependency management over disabling rules
+2. **Component Size**: Keep components under 200 lines by extracting logic into hooks
+3. **Type Safety**: Define interfaces for all props and state
+4. **Cleanup**: Always cleanup streams, intervals, and event listeners

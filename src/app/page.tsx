@@ -1,9 +1,16 @@
-import CallFeedFeature from '@/features/call-feed'; // index.tsxは省略可能
-
-// 元のコード (Product interface, followedCreators, formatDateTime, ProductCard, CreatorFeedHome) はすべて削除
-// createServerClientWithCookies や cookies のインポートも、CallFeedFeature内で処理されるため不要
+import { cookies } from 'next/headers'
+import { getUser } from '@/lib/auth'
+import CallFeedFeature from '@/features/call-feed'
+import LandingPage from './LandingPage'
 
 export default async function HomePage() {
-  // データ取得や認証関連のロジックは CallFeedFeature に移動したため、ここではシンプルに呼び出すだけ
-  return <CallFeedFeature />;
+  const cookieStore = await cookies()
+  const user = await getUser(cookieStore)
+
+  // ログイン済みユーザーにはコールフィード、未ログインユーザーにはランディングページを表示
+  if (user) {
+    return <CallFeedFeature />
+  } else {
+    return <LandingPage />
+  }
 }

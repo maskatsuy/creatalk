@@ -18,7 +18,10 @@ export async function getUser(cookieStore: CookieStore) {
   const { data: { user }, error } = await supabase.auth.getUser()
   
   if (error) {
-    console.error('Error getting user:', error.message)
+    // Only log errors that aren't related to missing auth sessions
+    if (error.message !== 'Auth session missing!') {
+      console.error('Error getting user:', error.message)
+    }
     return null
   }
   

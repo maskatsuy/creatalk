@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // 認証が不要なパス
-const publicPaths = ['/login', '/signup', '/auth/callback']
+const publicPaths = ['/', '/login', '/signup', '/auth/callback']
 // APIパス
 const apiPaths = ['/api']
 
@@ -53,9 +53,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // 認証不要なパスでログイン済みの場合
-  if (isPublicPath && user) {
-    console.log('[Middleware] Redirecting to / (public path, logged in)')
+  // 認証ページ（login/signup）でログイン済みの場合のみリダイレクト
+  const isAuthPage = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup'
+  if (isAuthPage && user) {
+    console.log('[Middleware] Redirecting to / (auth page, logged in)')
     return NextResponse.redirect(new URL('/', request.url))
   }
   
@@ -64,5 +65,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 } 
