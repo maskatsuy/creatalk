@@ -14,6 +14,8 @@ export interface QueueStatus {
   callRoom?: { // 自分の番の時の通話ルーム情報
     url: string
     token: string
+    startedAt?: string
+    endsAt?: string
   }
 }
 

@@ -40,8 +40,13 @@ export function ActiveCallPlans({ products }: ActiveCallPlansProps) {
         return false
       }
       
-      // Check if the date/time is still valid
-      if (product.slot_date && product.end_time) {
+      // Check new timestamp field first
+      if (product.end_at) {
+        const endAt = new Date(product.end_at)
+        return endAt > now
+      }
+      // Fallback to legacy fields
+      else if (product.slot_date && product.end_time) {
         const today = now.toISOString().split('T')[0]
         const currentTime = now.toTimeString().substring(0, 8)
         

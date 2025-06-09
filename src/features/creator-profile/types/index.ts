@@ -34,6 +34,8 @@ export interface CallProduct {
   slot_date?: string | null
   start_time?: string | null
   end_time?: string | null
+  start_at?: string | null    // New timestamp field
+  end_at?: string | null      // New timestamp field
   max_participants?: number | null
   remaining_slots?: number | null
   // Fixed type fields

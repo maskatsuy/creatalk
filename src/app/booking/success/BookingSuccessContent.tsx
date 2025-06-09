@@ -85,10 +85,24 @@ export function BookingSuccessContent() {
               </div>
 
               {bookingData.product.type === 'queue' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">参加形式</span>
-                  <Badge>先着順</Badge>
-                </div>
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">参加形式</span>
+                    <Badge>先着順</Badge>
+                  </div>
+                  {bookingData.isPlanActive && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">ステータス</span>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                        </span>
+                        <span className="text-sm font-medium text-green-600">開催中</span>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="flex items-center justify-between">
@@ -104,13 +118,28 @@ export function BookingSuccessContent() {
             <p className="text-blue-800 dark:text-blue-200">
               予約確認メールをご登録のメールアドレスに送信しました。
             </p>
-            <p className="text-blue-800 dark:text-blue-200 mt-2">
-              通話開始時間になりましたら、メールまたはマイページからご参加ください。
-            </p>
+            {bookingData?.type === 'queue' && bookingData?.isPlanActive ? (
+              <p className="text-blue-800 dark:text-blue-200 mt-2">
+                <span className="font-medium">通話プランが開催中です！</span><br />
+                すぐに待機室に入って順番をお待ちください。
+              </p>
+            ) : (
+              <p className="text-blue-800 dark:text-blue-200 mt-2">
+                通話開始時間になりましたら、メールまたはマイページからご参加ください。
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild variant="default">
+            {bookingData?.type === 'queue' && bookingData?.isPlanActive && bookingData?.planId && (
+              <Button asChild variant="default" className="bg-green-600 hover:bg-green-700">
+                <Link href={`/user/waiting-room/${bookingData.planId}`}>
+                  <Video className="h-4 w-4 mr-2" />
+                  待機室に入る（開催中）
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant={bookingData?.type === 'queue' && bookingData?.isPlanActive ? 'outline' : 'default'}>
               <Link href="/my-bookings">
                 <Calendar className="h-4 w-4 mr-2" />
                 予約一覧を見る

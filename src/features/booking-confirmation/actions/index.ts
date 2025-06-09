@@ -93,6 +93,27 @@ export async function createBookingFromPayment(params: {
         // Don't fail the booking if payment record fails
       }
 
+      // Check if the plan is currently active
+      const now = new Date()
+      let isPlanActive = false
+      
+      if (product.start_at && product.end_at) {
+        const startAt = new Date(product.start_at)
+        const endAt = new Date(product.end_at)
+        isPlanActive = now >= startAt && now <= endAt
+      } else if (product.slot_date && product.start_time && product.end_time) {
+        // Handle JST timezone properly
+        const startDateTimeJST = `${product.slot_date}T${product.start_time}+09:00`
+        const endDateTimeJST = `${product.slot_date}T${product.end_time}+09:00`
+        const startDateTime = new Date(startDateTimeJST)
+        const endDateTime = new Date(endDateTimeJST)
+        
+        if (product.end_time < product.start_time) {
+          endDateTime.setDate(endDateTime.getDate() + 1)
+        }
+        isPlanActive = now >= startDateTime && now <= endDateTime
+      }
+
       return {
         booking: {
           id: participant.id,
@@ -107,7 +128,9 @@ export async function createBookingFromPayment(params: {
             display_name: creatorInfo?.display_name || 'クリエイター'
           },
           amount: product.price,
-          status: 'waiting'
+          status: 'waiting',
+          planId: product.id,
+          isPlanActive
         }
       }
     } else {
@@ -118,13 +141,9 @@ export async function createBookingFromPayment(params: {
           user_id: user.id,
           creator_id: product.creator_id,
           product_id: params.productId,
-          booking_date: product.slot_date,
-          start_time: product.start_time,
-          end_time: product.end_time,
-          duration_minutes: product.duration_minutes,
           amount: product.price,
           status: 'confirmed',
-          stripe_payment_intent_id: params.stripePaymentIntentId
+          payment_intent_id: params.stripePaymentIntentId
         })
         .select()
         .single()

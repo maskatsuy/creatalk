@@ -4,7 +4,14 @@ export interface QueueParticipant {
   position: number
   status: 'waiting' | 'in_call' | 'completed'
   joined_at: string
-  user_profile: {
+  call_ended_at?: string | null
+  profiles?: {
+    id: string
+    email: string
+    full_name: string | null
+    avatar_url: string | null
+  } | null
+  user_profile?: {
     display_name: string | null
     avatar_url: string | null
     email?: string

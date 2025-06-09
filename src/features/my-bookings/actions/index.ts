@@ -2,11 +2,10 @@
 
 import { cookies } from 'next/headers'
 import { createServerClientWithCookies } from '@/lib/supabase-server'
+import { dailyService } from '@/lib/daily'
 import type { 
   UserBooking,
-  QueueParticipant,
-  CallProduct,
-  CallBooking
+  CallProduct
 } from '../types'
 
 export async function getUserBookings(userId: string): Promise<{ bookings: UserBooking[], error?: string }> {
@@ -73,6 +72,32 @@ export async function getUserBookings(userId: string): Promise<{ bookings: UserB
         .in('id', Array.from(productIds))
       
       products = productsData || []
+    }
+
+    // Check which queue plans are currently active (進行中)
+    const activePlanIds = new Set<string>()
+    const now = new Date()
+    
+    for (const product of products) {
+      if (product.type === 'queue') {
+        // Check if the plan is currently in its scheduled time
+        if (product.start_at && product.end_at) {
+          const startAt = new Date(product.start_at)
+          const endAt = new Date(product.end_at)
+          
+          if (now >= startAt && now <= endAt) {
+            activePlanIds.add(product.id)
+          }
+        } else if (product.slot_date && product.start_time && product.end_time) {
+          // Fallback to old fields
+          const startDateTime = new Date(`${product.slot_date}T${product.start_time}`)
+          const endDateTime = new Date(`${product.slot_date}T${product.end_time}`)
+          
+          if (now >= startDateTime && now <= endDateTime) {
+            activePlanIds.add(product.id)
+          }
+        }
+      }
     }
 
     const productMap = new Map(
@@ -144,6 +169,7 @@ export async function getUserBookings(userId: string): Promise<{ bookings: UserB
           createdAt: booking.created_at,
           queuePosition: booking.position,
           planId: booking.plan_id,
+          isPlanActive: activePlanIds.has(booking.plan_id),  // Set if plan is currently active
           product: {
             id: product.id,
             title: product.title,
@@ -207,5 +233,145 @@ export async function getUserBookings(userId: string): Promise<{ bookings: UserB
   } catch (error) {
     console.error('Get user bookings error:', error)
     return { bookings: [], error: 'Internal server error' }
+  }
+}
+
+export async function joinOngoingCall(bookingId: string, bookingType: 'queue' | 'fixed') {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClientWithCookies(cookieStore)
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: '認証エラー' }
+    }
+
+    // Get booking details based on type
+    if (bookingType === 'queue') {
+      // For queue bookings, get participant info and related call booking
+      const { data: participant, error: participantError } = await supabase
+        .from('queue_participants')
+        .select(`
+          *,
+          call_products!inner(
+            id,
+            title,
+            duration_minutes,
+            creator_id
+          )
+        `)
+        .eq('id', bookingId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (participantError || !participant) {
+        console.error('[joinOngoingCall] Queue participant error:', participantError)
+        return { error: '予約が見つかりません' }
+      }
+
+      if (participant.status !== 'in_progress') {
+        return { error: '通話が進行中ではありません' }
+      }
+
+      // Find the related call booking for this participant
+      const { data: callBooking, error: bookingError } = await supabase
+        .from('call_bookings')
+        .select(`
+          *,
+          call_rooms!call_bookings_room_id_fkey(
+            id,
+            daily_room_url,
+            daily_room_name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('product_id', participant.plan_id)
+        .eq('status', 'in_progress')
+        .single()
+
+      if (bookingError || !callBooking) {
+        console.error('[joinOngoingCall] Call booking error:', bookingError)
+        return { error: '通話室が見つかりません' }
+      }
+
+      if (!callBooking.call_rooms?.daily_room_url) {
+        return { error: '通話室が利用できません' }
+      }
+
+      // Create a new meeting token for the user
+      const userToken = await dailyService.createMeetingToken(
+        callBooking.call_rooms.daily_room_name,
+        {
+          user_id: user.id,
+          user_name: 'ユーザー',
+          is_owner: false
+        }
+      )
+
+      // Create embed URL for user
+      const embedUrl = `/call/${callBooking.id}?url=${encodeURIComponent(callBooking.call_rooms.daily_room_url)}&t=${userToken}&duration=${participant.call_products.duration_minutes}&userType=user&queue=true&planId=${participant.plan_id}`
+
+      return { 
+        success: true,
+        embedUrl,
+        roomUrl: callBooking.call_rooms.daily_room_url,
+        userToken
+      }
+    } else {
+      // For fixed bookings
+      const { data: booking, error: bookingError } = await supabase
+        .from('call_bookings')
+        .select(`
+          *,
+          call_products!inner(
+            duration_minutes
+          ),
+          call_rooms!call_bookings_room_id_fkey(
+            id,
+            daily_room_url,
+            daily_room_name
+          )
+        `)
+        .eq('id', bookingId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (bookingError || !booking) {
+        console.error('[joinOngoingCall] Fixed booking error:', bookingError)
+        return { error: '予約が見つかりません' }
+      }
+
+      if (booking.status !== 'in_progress') {
+        return { error: '通話が進行中ではありません' }
+      }
+
+      if (!booking.call_rooms?.daily_room_url) {
+        return { error: '通話室が利用できません' }
+      }
+
+      // Create a new meeting token for the user
+      const userToken = await dailyService.createMeetingToken(
+        booking.call_rooms.daily_room_name,
+        {
+          user_id: user.id,
+          user_name: 'ユーザー',
+          is_owner: false
+        }
+      )
+
+      // Create embed URL for user
+      const embedUrl = `/call/${bookingId}?url=${encodeURIComponent(booking.call_rooms.daily_room_url)}&t=${userToken}&duration=${booking.call_products.duration_minutes}&userType=user&booking=${bookingId}`
+
+      return { 
+        success: true,
+        embedUrl,
+        roomUrl: booking.call_rooms.daily_room_url,
+        userToken
+      }
+    }
+  } catch (error) {
+    console.error('[joinOngoingCall] Error:', error)
+    return { error: '内部エラーが発生しました' }
   }
 }

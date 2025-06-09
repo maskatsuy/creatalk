@@ -84,8 +84,14 @@ export async function approveApplication(applicationId: string) {
     .eq('id', applicationId)
 
   if (updateError) {
-    console.error('Update error:', updateError)
-    throw new Error(`申請の承認に失敗しました: ${updateError.message}`)
+    console.error('Update error details:', {
+      error: updateError,
+      message: updateError.message,
+      details: updateError.details,
+      hint: updateError.hint,
+      code: updateError.code
+    })
+    throw new Error(`申請の承認に失敗しました: ${updateError.message || 'Unknown error'}`)
   }
 
   revalidatePath('/admin/applications')

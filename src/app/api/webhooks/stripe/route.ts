@@ -11,9 +11,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(request: NextRequest) {
+  console.log('[Stripe Webhook] POST request received');
+  
   const body = await request.text();
   const headersList = await headers();
   const signature = headersList.get('stripe-signature');
+  
+  console.log('[Stripe Webhook] Signature present:', !!signature);
 
   if (!signature) {
     return NextResponse.json(
@@ -37,10 +41,13 @@ export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClientWithCookies(cookieStore);
 
+  console.log(`[Stripe Webhook] Received event: ${event.type}`);
+  
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        console.log('[Stripe Webhook] Processing checkout.session.completed');
         
         // メタデータから情報を取得
         const { userId, productId, creatorId, productType } = session.metadata || {};
@@ -62,6 +69,7 @@ export async function POST(request: NextRequest) {
 
         // 商品の残り枠を減らす（先着制の場合）
         if (productType === 'queue') {
+          console.log(`[Stripe Webhook] Decrementing slots for product: ${productId}`);
           const { error: productError } = await supabase.rpc(
             'decrement_remaining_slots',
             { product_id: productId }
@@ -69,6 +77,8 @@ export async function POST(request: NextRequest) {
 
           if (productError) {
             console.error('Failed to decrement slots:', productError);
+          } else {
+            console.log('[Stripe Webhook] Successfully decremented slots');
           }
         }
 

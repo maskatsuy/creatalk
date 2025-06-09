@@ -118,7 +118,7 @@ export const useAuth = (initialUser: User | null = null) => {
 
   const signUp = useCallback(async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -126,6 +126,22 @@ export const useAuth = (initialUser: User | null = null) => {
         },
       })
       if (error) throw error
+      
+      // ユーザーが作成されたら、プロファイルも作成
+      if (data.user) {
+        try {
+          // プロファイル作成を試みる（エラーは無視）
+          await supabase.rpc('create_user_profile_safe', {
+            p_user_id: data.user.id,
+            p_email: data.user.email || email,
+            p_display_name: null
+          })
+        } catch (profileError) {
+          console.log('Profile creation skipped:', profileError)
+          // プロファイル作成エラーは無視
+        }
+      }
+      
       toast.success('確認メールを送信しました')
     } catch (error: unknown) {
       if (error instanceof AuthError) {
@@ -138,19 +154,43 @@ export const useAuth = (initialUser: User | null = null) => {
         throw error
       }
     }
-  }, [supabase.auth])
+  }, [supabase.auth, supabase])
 
   const signOut = useCallback(async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      toast.success('ログアウトしました')
-      router.push('/')  // ランディングページに戻す
-    } catch (error: unknown) {
-      if (error instanceof AuthError) {
-        console.error('Error signing out:', error.message)
-        toast.error('ログアウトに失敗しました')
+      // セッションを確認
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        // セッションがない場合は、すでにログアウトしているとみなす
+        console.log('No session found, treating as already logged out')
+        router.push('/')
+        router.refresh()
+        return
       }
+
+      // ログアウト実行
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Error signing out:', error)
+        // Auth session missing エラーの場合は無視してホームに遷移
+        if (error.message.includes('session missing') || error.message === 'Auth session missing!') {
+          router.push('/')
+          router.refresh()
+          return
+        }
+        toast.error('ログアウトに失敗しました')
+      } else {
+        toast.success('ログアウトしました')
+        router.push('/')
+        router.refresh()
+      }
+    } catch (error: unknown) {
+      console.error('Unexpected error during logout:', error)
+      // エラーが発生してもホームに遷移
+      router.push('/')
+      router.refresh()
     }
   }, [supabase.auth, router])
 

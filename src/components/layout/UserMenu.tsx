@@ -47,7 +47,7 @@ export function UserMenu({ user, isAdmin, isCreator, signOut, isAuthPage }: User
       <DropdownMenuContent align="end" className="w-64">
         {/* ユーザー情報ヘッダー */}
         <DropdownMenuItem asChild>
-          <Link href="/profile" className="w-full cursor-pointer flex items-center space-x-3 px-2 py-3">
+          <Link href="/not-implemented" className="w-full cursor-pointer flex items-center space-x-3 px-2 py-3">
             <div className="relative">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user.user_metadata?.avatar_url} />

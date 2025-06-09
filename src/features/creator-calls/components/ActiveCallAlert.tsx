@@ -51,11 +51,11 @@ export function ActiveCallAlert({ bookings, onUpdate }: ActiveCallAlertProps) {
     setLoadingRoomId(bookingId)
     
     try {
-      // Check if this is an active plan (no actual booking yet)
-      if (booking.is_active_plan) {
+      // Check if this is an active plan (prefixed with "plan-")
+      if (bookingId.startsWith('plan-') || booking.is_active_plan) {
         // 先着制プランの場合は待機室に移動
         if (booking.call_products.type === 'queue') {
-          const planId = booking.plan_id
+          const planId = booking.plan_id || bookingId.replace('plan-', '')
           window.location.href = `/creator/waiting-room/${planId}`
           return
         } else {

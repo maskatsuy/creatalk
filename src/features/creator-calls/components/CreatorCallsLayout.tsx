@@ -58,6 +58,7 @@ export function CreatorCallsLayout() {
       if (reservationsResult.error) {
         toast.error(reservationsResult.error)
       } else {
+        console.log('[CreatorCallsLayout] Reservations received:', reservationsResult.reservations)
         setReservations(reservationsResult.reservations || [])
       }
 
@@ -118,11 +119,22 @@ export function CreatorCallsLayout() {
 
   // プランのステータスを判定する関数
   const isActivePlan = (product: CallProduct) => {
+    // まずステータスフィールドをチェック
+    if (product.status === 'completed' || product.status === 'inactive' || product.status === 'cancelled') {
+      return false
+    }
+    
     const now = new Date()
     
     if (product.type === 'queue') {
       // キュータイプの場合
-      if (product.slot_date && product.end_time) {
+      // 新しいタイムスタンプフィールドを優先的にチェック
+      if (product.end_at) {
+        const endAt = new Date(product.end_at)
+        return endAt > now
+      }
+      // レガシーフィールドのフォールバック
+      else if (product.slot_date && product.end_time) {
         // 特定の日付の場合、その日の終了時間をチェック
         const slotDate = new Date(product.slot_date)
         const [hours, minutes] = product.end_time.split(':').map(Number)
@@ -130,18 +142,10 @@ export function CreatorCallsLayout() {
         endDateTime.setHours(hours, minutes, 0, 0)
         
         return endDateTime > now
-      } else if (product.end_time) {
-        // 今日の終了時間をチェック（日付指定がない場合）
-        const [hours, minutes] = product.end_time.split(':').map(Number)
-        const endTime = new Date()
-        endTime.setHours(hours, minutes, 0, 0)
-        
-        // 今日の終了時間が過ぎていれば終了
-        return endTime > now
       }
       return true
     } else {
-      // 固定スロットタイプの場合、より厳密な判定
+      // 固定スロットタイプの場合
       
       // 1. 予約受付期間をチェック
       if (product.available_until) {
@@ -156,22 +160,6 @@ export function CreatorCallsLayout() {
         if (product.remaining_slots <= 0) {
           return false // 予約枠が満席
         }
-      }
-      
-      // 3. 予約開始日時をチェック
-      if (product.available_from) {
-        const availableFrom = new Date(product.available_from)
-        if (availableFrom > now) {
-          return true // まだ予約開始前だが、アクティブとみなす
-        }
-      }
-      
-      // 4. フォールバック：予約受付期間の情報がない場合は作成日ベースで判定
-      if (!product.available_until && !product.available_from) {
-        const createdAt = new Date(product.created_at)
-        const thirtyDaysFromCreation = new Date(createdAt)
-        thirtyDaysFromCreation.setDate(thirtyDaysFromCreation.getDate() + 30)
-        return thirtyDaysFromCreation > now
       }
       
       return true

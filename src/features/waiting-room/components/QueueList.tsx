@@ -50,26 +50,29 @@ export function QueueList({
           <div className="space-y-2">
             {queue.map((participant, index) => {
               const isNext = participant.id === nextParticipant?.id
+              const isCompleted = participant.status === 'completed'
+              const isInCall = participant.status === 'in_call'
+              
               return (
                 <div 
                   key={participant.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isCompleted ? 'bg-gray-100 dark:bg-gray-800/50 opacity-60' :
+                    isInCall ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-600' :
                     isNext ? 'bg-blue-100 dark:bg-blue-800/40 border-2 border-blue-300 dark:border-blue-600' :
-                    participant.status === 'waiting' ? 'bg-gray-50 dark:bg-gray-800' :
-                    participant.status === 'in_call' ? 'bg-red-50 dark:bg-red-900/20' :
                     'bg-gray-50 dark:bg-gray-800'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar className="w-8 h-8">
-                        <AvatarImage src={participant.user_profile?.avatar_url || undefined} />
+                        <AvatarImage src={participant.profiles?.avatar_url || participant.user_profile?.avatar_url || undefined} />
                         <AvatarFallback className={
                           isNext ? 'bg-blue-200 dark:bg-blue-700 text-blue-700 dark:text-blue-300' :
                           'bg-gray-200 dark:bg-gray-700'
                         }>
-                          {participant.user_profile?.display_name 
-                            ? participant.user_profile.display_name.charAt(0).toUpperCase()
+                          {(participant.profiles?.full_name || participant.user_profile?.display_name)
+                            ? (participant.profiles?.full_name || participant.user_profile?.display_name)?.charAt(0).toUpperCase()
                             : <User className="h-4 w-4" />
                           }
                         </AvatarFallback>
@@ -84,23 +87,42 @@ export function QueueList({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setSelectedParticipant(participant)}
-                          className={`font-medium hover:underline cursor-pointer text-left ${isNext ? 'text-blue-900 dark:text-blue-100' : ''}`}
+                          className={`font-medium hover:underline cursor-pointer text-left ${
+                          isCompleted ? 'text-gray-500 dark:text-gray-400 line-through' :
+                          isInCall ? 'text-red-900 dark:text-red-100' :
+                          isNext ? 'text-blue-900 dark:text-blue-100' : ''
+                        }`}
                         >
-                          {participant.user_profile?.display_name || participant.user_profile?.email || `ユーザー${index + 1}`}
+                          {participant.profiles?.full_name || 
+                           participant.profiles?.email || 
+                           participant.user_profile?.display_name || 
+                           participant.user_profile?.email || 
+                           `ユーザー${index + 1}`}
                         </button>
-                        {isNext && <span className="text-xs bg-blue-200 dark:bg-blue-700 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">次</span>}
+                        {isNext && !isInCall && <span className="text-xs bg-blue-200 dark:bg-blue-700 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">次</span>}
+                        {isInCall && <span className="text-xs bg-red-200 dark:bg-red-700 text-red-700 dark:text-red-300 px-2 py-1 rounded animate-pulse">通話中</span>}
                       </div>
-                      <p className={`text-xs ${isNext ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
-                        {new Date(participant.joined_at).toLocaleTimeString('ja-JP')}
+                      <p className={`text-xs ${
+                        isCompleted ? 'text-gray-400 dark:text-gray-500' :
+                        isInCall ? 'text-red-600 dark:text-red-400' :
+                        isNext ? 'text-blue-600 dark:text-blue-400' : 
+                        'text-muted-foreground'
+                      }`}>
+                        参加: {new Date(participant.joined_at).toLocaleTimeString('ja-JP')}
+                        {participant.call_ended_at && (
+                          <> | 終了: {new Date(participant.call_ended_at).toLocaleTimeString('ja-JP')}</>
+                        )}
                       </p>
                     </div>
                   </div>
                   <Badge variant={
-                    participant.status === 'waiting' ? 'default' :
+                    participant.status === 'completed' ? 'secondary' :
                     participant.status === 'in_call' ? 'destructive' :
-                    'secondary'
+                    'default'
+                  } className={
+                    participant.status === 'in_call' ? 'animate-pulse' : ''
                   }>
-                    {participant.status === 'waiting' ? '予約中' :
+                    {participant.status === 'waiting' ? '待機中' :
                      participant.status === 'in_call' ? '通話中' :
                      '完了'}
                   </Badge>

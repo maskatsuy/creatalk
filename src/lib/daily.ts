@@ -38,6 +38,14 @@ export interface CreateRoomOptions {
     enable_prejoin_ui?: boolean
     exp?: number // Unix timestamp
     lang?: 'ja' | 'en'
+    // Additional UI controls
+    enable_pip_ui?: boolean
+    enable_dialin_ui?: boolean
+    enable_dialout_ui?: boolean
+    enable_hand_raising?: boolean
+    enable_people_ui?: boolean
+    enable_emoji_reactions?: boolean
+    enable_breakout_rooms?: boolean
   }
 }
 
@@ -52,8 +60,18 @@ class DailyService {
     this.domain = process.env.NEXT_PUBLIC_DAILY_DOMAIN || ''
 
     if (!this.apiKey) {
-      console.warn('Daily.co API key is not set')
+      console.error('DAILY_API_KEY environment variable is not set')
+      throw new Error('Daily.co API key is required')
     }
+    if (!this.domain) {
+      console.error('NEXT_PUBLIC_DAILY_DOMAIN environment variable is not set')
+      throw new Error('Daily.co domain is required')
+    }
+    
+    console.log('Daily.co service initialized:', {
+      domain: this.domain,
+      hasApiKey: !!this.apiKey
+    })
   }
 
   private get headers() {
@@ -76,10 +94,9 @@ class DailyService {
         properties: {
           max_participants: options.properties?.max_participants || 2,
           enable_recording: options.properties?.enable_recording || false,
-          enable_chat: options.properties?.enable_chat || true,
-          enable_screenshare: options.properties?.enable_screenshare || true,
-          enable_video_processing_ui: options.properties?.enable_video_processing_ui || false,
-          eject_at_room_exp: options.properties?.eject_at_room_exp || true,
+          enable_chat: options.properties?.enable_chat !== undefined ? options.properties.enable_chat : false,
+          enable_screenshare: options.properties?.enable_screenshare !== undefined ? options.properties.enable_screenshare : false,
+          eject_at_room_exp: options.properties?.eject_at_room_exp !== undefined ? options.properties.eject_at_room_exp : false,
           enable_prejoin_ui: options.properties?.enable_prejoin_ui !== undefined ? options.properties.enable_prejoin_ui : false,
           exp: options.properties?.exp || Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
           lang: options.properties?.lang || 'ja'
@@ -97,8 +114,22 @@ class DailyService {
         url: `https://${this.domain}.daily.co/${roomName}`
       }
     } catch (error) {
-      console.error('Error creating Daily.co room:', error)
-      throw new Error('Failed to create video room')
+      if (axios.isAxiosError(error)) {
+        console.error('Daily.co API Error:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            data: error.config?.data
+          }
+        })
+        throw new Error(`Daily.co API Error: ${error.response?.status} ${error.response?.statusText}`)
+      } else {
+        console.error('Error creating Daily.co room:', error)
+        throw new Error('Failed to create video room')
+      }
     }
   }
 
@@ -165,8 +196,23 @@ class DailyService {
 
       return response.data.token
     } catch (error) {
-      console.error('Error creating meeting token:', error)
-      throw new Error('Failed to create meeting token')
+      if (axios.isAxiosError(error)) {
+        console.error('Daily.co Meeting Token API Error:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          roomName,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            data: error.config?.data
+          }
+        })
+        throw new Error(`Daily.co Token API Error: ${error.response?.status} ${error.response?.statusText}`)
+      } else {
+        console.error('Error creating meeting token:', error)
+        throw new Error('Failed to create meeting token')
+      }
     }
   }
 

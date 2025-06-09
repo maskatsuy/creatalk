@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, Clock, User, Video, Hash } from 'lucide-react'
+import { Calendar, Clock, User, Video, Hash, Phone } from 'lucide-react'
+import { toast } from 'sonner'
+import { joinOngoingCall } from '../actions'
 import type { UserBooking } from '../types'
 
 interface BookingCardProps {
@@ -13,10 +17,14 @@ interface BookingCardProps {
 }
 
 export function BookingCard({ booking }: BookingCardProps) {
+  const router = useRouter()
+  const [isJoining, setIsJoining] = useState(false)
+  
   const statusConfig = {
     waiting: { label: '待機中', variant: 'secondary' as const, pulse: false },
     confirmed: { label: '確定', variant: 'default' as const, pulse: false },
     in_progress: { label: '進行中', variant: 'default' as const, pulse: true },
+    in_call: { label: '通話中', variant: 'default' as const, pulse: true },
     completed: { label: '完了', variant: 'secondary' as const, pulse: false },
     cancelled: { label: 'キャンセル', variant: 'destructive' as const, pulse: false }
   }
@@ -36,6 +44,24 @@ export function BookingCard({ booking }: BookingCardProps) {
   const isUpcoming = ['waiting', 'confirmed'].includes(booking.status)
   const canJoin = booking.status === 'in_progress' || 
     (booking.status === 'confirmed' && booking.type === 'fixed')
+  const isOngoing = booking.status === 'in_progress'
+
+  const handleJoinCall = async () => {
+    setIsJoining(true)
+    try {
+      const result = await joinOngoingCall(booking.id, booking.type)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.embedUrl) {
+        toast.success('通話に接続しています...')
+        router.push(result.embedUrl)
+      }
+    } catch {
+      toast.error('通話への接続に失敗しました')
+    } finally {
+      setIsJoining(false)
+    }
+  }
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -107,23 +133,58 @@ export function BookingCard({ booking }: BookingCardProps) {
           </div>
         </div>
 
+        {/* Show join button for ongoing calls */}
+        {isOngoing && (
+          <div className="pt-2">
+            <Button 
+              onClick={handleJoinCall} 
+              disabled={isJoining}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {isJoining ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                  接続中...
+                </>
+              ) : (
+                <>
+                  <Phone className="h-4 w-4 mr-2" />
+                  通話に参加
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              通話が進行中です。いつでも参加できます。
+            </p>
+          </div>
+        )}
+
         {isUpcoming && (
           <div className="pt-2 space-y-2">
             {booking.type === 'queue' && booking.status === 'waiting' && (
-              <Button asChild className="w-full">
-                <Link href={`/user/waiting-room/${booking.planId}`}>
-                  <Video className="h-4 w-4 mr-2" />
-                  待機室に入る
-                </Link>
-              </Button>
+              <>
+                {booking.isPlanActive && (
+                  <div className="flex items-center gap-2 text-green-600 text-sm mb-2">
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                    </span>
+                    <span className="font-medium">通話プランが開催中です</span>
+                  </div>
+                )}
+                <Button 
+                  asChild 
+                  className={`w-full ${booking.isPlanActive ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  variant={booking.isPlanActive ? 'default' : 'default'}
+                >
+                  <Link href={`/user/waiting-room/${booking.planId}`}>
+                    <Video className="h-4 w-4 mr-2" />
+                    待機室に入る
+                  </Link>
+                </Button>
+              </>
             )}
-            {/* デバッグ用 */}
-            {booking.type === 'queue' && (
-              <p className="text-xs text-muted-foreground">
-                Plan ID: {booking.planId}
-              </p>
-            )}
-            {canJoin && booking.type === 'fixed' && (
+            {canJoin && booking.type === 'fixed' && !isOngoing && (
               <Button asChild className="w-full">
                 <Link href={`/call/waiting-room?planId=${booking.product.id}`}>
                   <Video className="h-4 w-4 mr-2" />

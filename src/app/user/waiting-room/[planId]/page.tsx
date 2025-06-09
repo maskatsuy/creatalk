@@ -28,30 +28,18 @@ export default async function UserWaitingRoomPage({ params }: PageProps) {
     .select('*')
     .eq('plan_id', planId)
     .eq('user_id', user.id)
-    .eq('status', 'waiting')
+    .in('status', ['waiting', 'in_call']) // Include both waiting and in_call status
     .order('created_at', { ascending: true })
     .limit(1)
 
-  // Additional debug query to see all participants for this user
-  const { data: allUserParticipants } = await supabase
-    .from('queue_participants')
-    .select('id, plan_id, status, user_id')
-    .eq('user_id', user.id)
-  
-  console.log('[UserWaitingRoom] Debug info:', { 
+  console.log('[UserWaitingRoom] Participant query:', { 
     urlPlanId: planId,
     userId: user.id, 
     queryResult: {
       participants, 
       error,
       count: participants?.length
-    },
-    allUserParticipants: allUserParticipants?.map(p => ({
-      id: p.id,
-      plan_id: p.plan_id,
-      status: p.status,
-      matches: p.plan_id === planId
-    }))
+    }
   })
 
   if (error || !participants || participants.length === 0) {

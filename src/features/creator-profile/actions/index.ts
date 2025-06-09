@@ -62,6 +62,8 @@ export async function getCreatorProfile(creatorId: string): Promise<{
         slot_date,
         start_time,
         end_time,
+        start_at,
+        end_at,
         max_participants,
         remaining_slots,
         available_from,
@@ -73,12 +75,20 @@ export async function getCreatorProfile(creatorId: string): Promise<{
 
     // Filter available products based on current date/time
     const productsData = allProducts?.filter(product => {
-      if (product.type === 'queue' && product.slot_date && product.end_time) {
-        // For queue type: check if slot_date is today or future, and if today, end_time hasn't passed
-        const isAvailable = product.slot_date > today || 
-                          (product.slot_date === today && product.end_time > currentTime)
-        
-        return isAvailable
+      if (product.type === 'queue') {
+        // Check new timestamp fields first
+        if (product.end_at) {
+          const endAt = new Date(product.end_at)
+          return endAt > now
+        }
+        // Fallback to legacy fields
+        else if (product.slot_date && product.end_time) {
+          // For queue type: check if slot_date is today or future, and if today, end_time hasn't passed
+          const isAvailable = product.slot_date > today || 
+                            (product.slot_date === today && product.end_time > currentTime)
+          
+          return isAvailable
+        }
       } else if (product.type === 'fixed' && product.available_until) {
         // For fixed type: check if available_until is in the future
         const isAvailable = new Date(product.available_until) > now

@@ -7,9 +7,10 @@ import { Heart } from 'lucide-react'; // 空の状態表示用
 
 interface CallProductFeedLayoutProps {
   products: Product[];
+  hasFollowedCreators?: boolean;
 }
 
-export default function CallProductFeedLayout({ products }: CallProductFeedLayoutProps) {
+export default function CallProductFeedLayout({ products, hasFollowedCreators = true }: CallProductFeedLayoutProps) {
   const router = useRouter();
 
   const handleSearchCreators = () => {
@@ -21,10 +22,12 @@ export default function CallProductFeedLayout({ products }: CallProductFeedLayou
       <div className="container mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-            フォロー中のクリエイター
+            {hasFollowedCreators ? 'フォロー中のクリエイター' : '最新の通話予定'}
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            お気に入りのクリエイターの最新通話をチェックしよう
+            {hasFollowedCreators 
+              ? 'お気に入りのクリエイターの最新通話をチェックしよう'
+              : 'クリエイターをフォローして、最新情報を受け取ろう'}
           </p>
         </div>
 
@@ -40,10 +43,12 @@ export default function CallProductFeedLayout({ products }: CallProductFeedLayou
               <Heart className="w-12 h-12 text-zinc-400" />
             </div>
             <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-              まだ通話予定がありません
+              {hasFollowedCreators ? 'まだ通話予定がありません' : 'クリエイターをフォローしよう'}
             </h3>
             <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-              フォロー中のクリエイターからの新しい通話予定をお待ちください
+              {hasFollowedCreators 
+                ? 'フォロー中のクリエイターからの新しい通話予定をお待ちください'
+                : 'お気に入りのクリエイターをフォローして、最新の通話情報を受け取りましょう'}
             </p>
             <button 
               onClick={handleSearchCreators}

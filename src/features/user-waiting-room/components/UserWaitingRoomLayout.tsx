@@ -4,7 +4,7 @@ import { DevicePreview } from '@/features/device-preview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Clock, Users, LogOut, Hash, Video } from 'lucide-react'
+import { Clock, LogOut, Hash, Video } from 'lucide-react'
 import { useUserQueueStatus } from '../hooks/useUserQueueStatus'
 import Link from 'next/link'
 

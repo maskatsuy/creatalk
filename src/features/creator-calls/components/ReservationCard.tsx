@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -14,9 +15,10 @@ import {
   Play,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Phone
 } from 'lucide-react'
-import { updateReservationStatus, createCallRoom } from '../actions'
+import { updateReservationStatus, startCall, rejoinCall } from '../actions'
 import { toast } from 'sonner'
 import type { CallReservation } from '../types'
 
@@ -54,6 +56,7 @@ const statusConfig = {
 }
 
 export function ReservationCard({ reservation, onStatusUpdate }: ReservationCardProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const currentStatus = reservation.status?.status || 'pending'
   const status = statusConfig[currentStatus as keyof typeof statusConfig]
@@ -97,12 +100,12 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
   const handleStartCall = async () => {
     setLoading(true)
     try {
-      const result = await createCallRoom(reservation.id)
+      const result = await startCall(reservation.id)
       if (result.error) {
         toast.error(result.error)
-      } else {
+      } else if (result.embedUrl) {
         toast.success('通話室を作成しました')
-        window.open(result.roomUrl, '_blank')
+        router.push(result.embedUrl)
         onStatusUpdate?.()
       }
     } catch {
@@ -206,13 +209,29 @@ export function ReservationCard({ reservation, onStatusUpdate }: ReservationCard
             </Button>
           )}
           
-          {reservation.status?.status === 'in_progress' && reservation.room_url && (
+          {reservation.status?.status === 'in_progress' && (
             <Button 
               size="sm"
-              onClick={() => window.open(reservation.room_url!, '_blank')}
+              onClick={async () => {
+                setLoading(true)
+                try {
+                  const result = await rejoinCall(reservation.id)
+                  if (result.error) {
+                    toast.error(result.error)
+                  } else if (result.embedUrl) {
+                    toast.success('通話に接続しています...')
+                    router.push(result.embedUrl)
+                  }
+                } catch {
+                  toast.error('通話への接続に失敗しました')
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading}
               className="bg-green-600 hover:bg-green-700"
             >
-              <Video className="h-4 w-4 mr-1" />
+              <Phone className="h-4 w-4 mr-1" />
               通話に参加
             </Button>
           )}

@@ -13,7 +13,7 @@ interface UserProfileDialogProps {
 export function UserProfileDialog({ participant, open, onOpenChange }: UserProfileDialogProps) {
   if (!participant) return null
 
-  const profile = participant.user_profile
+  const profile = participant.profiles || participant.user_profile
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -28,8 +28,8 @@ export function UserProfileDialog({ participant, open, onOpenChange }: UserProfi
             <Avatar className="w-16 h-16">
               <AvatarImage src={profile?.avatar_url || undefined} />
               <AvatarFallback className="bg-gray-200 dark:bg-gray-700 text-lg">
-                {profile?.display_name 
-                  ? profile.display_name.charAt(0).toUpperCase()
+                {(profile && ('full_name' in profile ? profile.full_name : profile.display_name))
+                  ? (profile && ('full_name' in profile ? profile.full_name : profile.display_name))?.charAt(0).toUpperCase()
                   : <User className="h-8 w-8" />
                 }
               </AvatarFallback>
@@ -37,7 +37,7 @@ export function UserProfileDialog({ participant, open, onOpenChange }: UserProfi
             
             <div className="flex-1">
               <h3 className="text-lg font-semibold">
-                {profile?.display_name || 'ユーザー名なし'}
+                {(profile && ('full_name' in profile ? profile.full_name : profile.display_name)) || 'ユーザー名なし'}
               </h3>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <Mail className="h-4 w-4" />
@@ -75,7 +75,7 @@ export function UserProfileDialog({ participant, open, onOpenChange }: UserProfi
           </div>
 
           {/* バイオ（もしプロフィールに含まれている場合） */}
-          {profile?.bio && (
+          {profile && 'bio' in profile && profile.bio && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium">自己紹介</h4>
               <p className="text-sm text-muted-foreground bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
@@ -85,7 +85,7 @@ export function UserProfileDialog({ participant, open, onOpenChange }: UserProfi
           )}
 
           {/* 参加回数（もしデータがある場合） */}
-          {profile?.total_calls && (
+          {profile && 'total_calls' in profile && profile.total_calls && (
             <div className="flex items-center gap-2 text-sm">
               <span className="font-medium">過去の通話回数:</span>
               <Badge variant="outline">{profile.total_calls}回</Badge>

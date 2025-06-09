@@ -26,12 +26,13 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
     }
 
     // Get my position (複数ある場合は最も早い位置のものを取得)
+    // waiting または in_call ステータスの参加者を取得
     const { data: myParticipants, error: myError } = await supabase
       .from('queue_participants')
       .select('*')
       .eq('plan_id', planId)
       .eq('user_id', userId)
-      .eq('status', 'waiting')
+      .in('status', ['waiting', 'in_call'])
       .order('position', { ascending: true })
       .limit(1)
 
@@ -69,15 +70,24 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
       .eq('status', 'approved')
       .single()
 
-    // Get all waiting participants
-    const { data: allWaiting } = await supabase
+    // Get all active participants (waiting or in_call)
+    const { data: allActive } = await supabase
       .from('queue_participants')
-      .select('position')
+      .select('position, status')
       .eq('plan_id', planId)
-      .eq('status', 'waiting')
-      .lt('position', myParticipant.position)
+      .in('status', ['waiting', 'in_call'])
+      .order('position', { ascending: true })
 
-    const peopleAhead = allWaiting?.length || 0
+    // 自分より前にいる待機中の人数を計算
+    const peopleAhead = allActive?.filter(p => 
+      p.status === 'waiting' && p.position < myParticipant.position
+    ).length || 0
+    
+    // 実際にアクティブな参加者の総数（待機中 + 通話中）
+    const totalActive = allActive?.length || 0
+    
+    // 自分の実際の順番（アクティブな参加者の中での順位）
+    const myActualPosition = allActive ? allActive.findIndex(p => p.position === myParticipant.position) + 1 : myParticipant.position
 
     // Check if there's a current call
     const { data: currentCall } = await supabase
@@ -101,12 +111,12 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
       : peopleAhead * plan.duration_minutes
 
     // 自分の番の場合、通話ルームがあるか確認
-    let callRoom: { url: string; token: string } | undefined
+    let callRoom: { url: string; token: string; startedAt?: string; endsAt?: string } | undefined
     if (isMyTurn) {
       // 自分の通話ルームを検索
       const { data: myCall } = await supabase
         .from('current_queue_calls')
-        .select('daily_room_url, daily_room_name')
+        .select('daily_room_url, daily_room_name, status, started_at, ends_at')
         .eq('plan_id', planId)
         .eq('participant_id', myParticipant.id)
         .eq('status', 'active')
@@ -123,8 +133,8 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
               planTitle: plan.title,
               planDuration: plan.duration_minutes,
               creatorName: creator?.display_name || 'クリエイター',
-              myPosition: myParticipant.position,
-              totalWaiting: (allWaiting?.length || 0) + 1,
+              myPosition: myActualPosition,
+              totalWaiting: totalActive,
               estimatedWaitTime: estimatedWaitTime > 0 ? estimatedWaitTime : null,
               isMyTurn: false, // 通話が終了しているので、自分の番ではない
               callRoom: undefined
@@ -159,7 +169,9 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
             const { token } = await response.json()
             callRoom = {
               url: myCall.daily_room_url,
-              token
+              token,
+              startedAt: myCall.started_at,
+              endsAt: myCall.ends_at
             }
             console.log('[getUserQueueStatus] Token generated successfully')
           } else {
@@ -177,8 +189,8 @@ export async function getUserQueueStatus(planId: string, userId: string): Promis
         planTitle: plan.title,
         planDuration: plan.duration_minutes, // 通話時間を追加
         creatorName: creator?.display_name || 'クリエイター',
-        myPosition: myParticipant.position,
-        totalWaiting: (allWaiting?.length || 0) + 1,
+        myPosition: myActualPosition,
+        totalWaiting: totalActive,
         estimatedWaitTime: estimatedWaitTime > 0 ? estimatedWaitTime : null,
         isMyTurn,
         currentCall: currentCall ? {

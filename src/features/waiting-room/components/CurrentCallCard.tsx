@@ -47,7 +47,10 @@ export function CurrentCallCard({
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium">
-              {currentCall.participant.user_profile.display_name || 'ゲスト'}
+              {currentCall.participant.profiles?.full_name || 
+               currentCall.participant.profiles?.email || 
+               currentCall.participant.user_profile?.display_name || 
+               'ゲスト'}
             </p>
             <p className="text-sm text-muted-foreground">
               開始: {new Date(currentCall.started_at).toLocaleTimeString('ja-JP')}

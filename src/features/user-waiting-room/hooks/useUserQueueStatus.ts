@@ -140,14 +140,23 @@ export function useUserQueueStatus(planId: string, userId: string) {
         t: token,
         duration: status.planDuration?.toString() || '30', // 実際の通話時間を使用
         queue: 'true',
-        planId: planId
+        planId: planId,
+        userType: 'user' // ユーザータイプを追加
       })
+      
+      // 通話の開始・終了時刻を追加
+      if (status.callRoom?.startedAt) {
+        params.set('startedAt', status.callRoom.startedAt)
+      }
+      if (status.callRoom?.endsAt) {
+        params.set('endsAt', status.callRoom.endsAt)
+      }
       
       router.push(`/call/${roomName}?${params.toString()}`)
     }, 1500)
     
     return () => clearTimeout(timer)
-  }, [status?.callRoom, planId, router])
+  }, [status?.callRoom, status?.planDuration, planId, router])
 
   // 初回データ取得と定期更新
   useEffect(() => {

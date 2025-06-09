@@ -56,12 +56,15 @@ export interface CallProduct {
   price: number
   duration: number
   recording_enabled: boolean
+  status: 'active' | 'inactive' | 'completed' | 'cancelled'
   created_at: string
   updated_at: string
   // Schedule information
-  slot_date?: string | null  // For queue type
-  start_time?: string | null  // Time format HH:mm
-  end_time?: string | null    // Time format HH:mm
+  slot_date?: string | null  // For queue type (legacy)
+  start_time?: string | null  // Time format HH:mm (legacy)
+  end_time?: string | null    // Time format HH:mm (legacy)
+  start_at?: string | null    // For queue type - ISO datetime with timezone
+  end_at?: string | null      // For queue type - ISO datetime with timezone
   available_from?: string | null  // For fixed type - ISO datetime
   available_until?: string | null  // For fixed type - ISO datetime
   max_participants?: number | null
@@ -84,6 +87,7 @@ export interface CallFilters {
   dateFrom?: string
   dateTo?: string
   productId?: string
+  searchTerm?: string
 }
 
 export interface Pagination {

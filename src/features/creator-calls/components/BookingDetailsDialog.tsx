@@ -72,7 +72,7 @@ export function BookingDetailsDialog({ productId, productTitle, productType, chi
       } else {
         setBookings(result.bookings || [])
         setProduct(result.product)
-        setStats(result.stats || {
+        setStats(result.summary || {
           total: 0,
           pending: 0,
           confirmed: 0,

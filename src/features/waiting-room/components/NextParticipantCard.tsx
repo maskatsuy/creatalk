@@ -52,10 +52,10 @@ export function NextParticipantCard({
       <CardContent>
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10">
-            <AvatarImage src={participant.user_profile?.avatar_url || undefined} />
+            <AvatarImage src={participant.profiles?.avatar_url || participant.user_profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-blue-200 dark:bg-blue-700 text-blue-700 dark:text-blue-300">
-              {participant.user_profile?.display_name 
-                ? participant.user_profile.display_name.charAt(0).toUpperCase()
+              {(participant.profiles?.full_name || participant.user_profile?.display_name)
+                ? (participant.profiles?.full_name || participant.user_profile?.display_name)?.charAt(0).toUpperCase()
                 : <User className="h-5 w-5" />
               }
             </AvatarFallback>
@@ -65,7 +65,11 @@ export function NextParticipantCard({
               onClick={() => setShowProfile(true)}
               className="font-medium text-blue-900 dark:text-blue-100 hover:underline cursor-pointer text-left"
             >
-              {participant.user_profile?.display_name || participant.user_profile?.email || 'ユーザー1'}
+              {participant.profiles?.full_name || 
+               participant.profiles?.email || 
+               participant.user_profile?.display_name || 
+               participant.user_profile?.email || 
+               'ユーザー1'}
             </button>
             <p className="text-xs text-blue-600 dark:text-blue-400">
               {new Date(participant.joined_at).toLocaleTimeString('ja-JP')}

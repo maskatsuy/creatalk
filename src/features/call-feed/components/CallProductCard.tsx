@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users } from 'lucide-react';
-import { createCheckoutSession } from '@/actions/stripe';
-import { toast } from 'sonner';
 import { useAuthContext } from '@/features/auth';
 import { useRouter } from 'next/navigation';
 
@@ -25,45 +23,29 @@ export interface Product {
   isLive: boolean;
 }
 
-// formatDateTime 関数の仮プレースホルダーは不要なので削除
-
 export default function CallProductCard({ product }: { product: Product }) {
-  const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuthContext();
   const router = useRouter();
   const isUrgent = product.remainingSlots <= 3 && product.remainingSlots > 0;
   const isSoldOut = product.remainingSlots === 0;
+  
+  // Check availability based on date/time
+  const isAvailable = () => {
+    if (isSoldOut) return false;
+    
+    // For now, we'll assume the product is available if it's shown
+    // The actual filtering is done server-side in the feed
+    return true;
+  };
 
-  const handleReservation = async () => {
+  const handleReservation = () => {
     if (!user) {
       router.push('/login');
       return;
     }
 
-    if (product.type === 'queue') {
-      // 先着制の場合はStripe決済へ
-      setIsLoading(true);
-      try {
-        const result = await createCheckoutSession({
-          productId: product.id,
-          userId: user.id,
-          successUrl: `${window.location.origin}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: window.location.href
-        });
-        
-        if (result.error) {
-          toast.error(result.error);
-        }
-      } catch (error) {
-        console.error('Error creating checkout session:', error);
-        toast.error('予約処理中にエラーが発生しました');
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      // 時間制は別途実装
-      toast.info('時間制の予約は現在準備中です');
-    }
+    // プロフィールページと同じく、予約詳細ページへ遷移
+    router.push(`/booking/${product.id}`);
   };
 
   return (
@@ -168,17 +150,17 @@ export default function CallProductCard({ product }: { product: Product }) {
           </div>
 
           <Button
-            disabled={isSoldOut || isLoading}
-            variant={isUrgent ? "default" : "secondary"}
+            disabled={!isAvailable()}
+            variant="default"
             size="sm"
             className={`w-full ${
-              isSoldOut || isLoading
+              !isAvailable()
                 ? 'opacity-50 cursor-not-allowed'
                 : ''
             }`}
             onClick={handleReservation}
           >
-            {isLoading ? '処理中...' : isSoldOut ? '売り切れ' : isUrgent ? '急いで予約' : '予約する'}
+            {isSoldOut ? '売り切れ' : isUrgent ? '急いで予約' : '予約する'}
           </Button>
         </div>
       </div>

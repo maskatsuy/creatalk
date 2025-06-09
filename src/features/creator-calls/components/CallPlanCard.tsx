@@ -20,7 +20,7 @@ import {
   Video
 } from 'lucide-react'
 import type { CallProduct } from '../types'
-import { deleteCallProduct } from '../actions'
+import { cancelCallProduct } from '../actions'
 import { BookingDetailsDialog } from './BookingDetailsDialog'
 import { toast } from 'sonner'
 
@@ -37,23 +37,37 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
     toast.info('プラン編集機能は開発中です')
   }
 
-  const handleDelete = async () => {
-    if (!confirm('このプランを削除しますか？この操作は取り消せません。')) {
+  const handleCancel = async () => {
+    const reason = prompt('キャンセル理由を入力してください（例：体調不良、緊急事態など）')
+    if (!reason) {
+      return
+    }
+
+    if (!confirm(`このプランをキャンセルしますか？\n\n理由: ${reason}\n\n予約済みのユーザーに通知が送られます。`)) {
       return
     }
 
     setIsLoading(true)
     try {
-      const result = await deleteCallProduct(product.id)
+      const result = await cancelCallProduct(product.id, reason)
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success('プランを削除しました')
+        if (result.affectedBookings && result.affectedBookings > 0) {
+          toast.success(`プランをキャンセルしました。${result.affectedBookings}件の予約に通知を送信しました。`)
+        } else {
+          toast.success('プランをキャンセルしました')
+        }
+        // Force immediate UI update
         onUpdate()
+        // Additional delay to ensure state updates
+        setTimeout(() => {
+          onUpdate()
+        }, 1000)
       }
     } catch (error) {
-      console.error('Error deleting plan:', error)
-      toast.error('プランの削除に失敗しました')
+      console.error('Error cancelling product:', error)
+      toast.error('キャンセルに失敗しました')
     } finally {
       setIsLoading(false)
     }
@@ -71,7 +85,7 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
       case 'queue':
         return '先着制'
       case 'fixed':
-        return '時間指定'
+        return '時間指定 (開発中)'
       default:
         return type
     }
@@ -89,13 +103,31 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
   }
 
   const formatScheduleInfo = () => {
-    if (product.type === 'queue' && product.slot_date && product.start_time && product.end_time) {
-      const date = new Date(product.slot_date).toLocaleDateString('ja-JP', {
-        month: 'short',
-        day: 'numeric',
-        weekday: 'short'
-      })
-      return `${date} ${product.start_time}〜${product.end_time}`
+    if (product.type === 'queue') {
+      // Use start_at and end_at timestamps if available (preferred)
+      if (product.start_at && product.end_at) {
+        const startDate = new Date(product.start_at)
+        const endDate = new Date(product.end_at)
+        
+        const date = startDate.toLocaleDateString('ja-JP', {
+          month: 'short',
+          day: 'numeric',
+          weekday: 'short'
+        })
+        const startTime = startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+        const endTime = endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+        
+        return `${date} ${startTime}〜${endTime}`
+      }
+      // Fallback to legacy fields
+      else if (product.slot_date && product.start_time && product.end_time) {
+        const date = new Date(product.slot_date).toLocaleDateString('ja-JP', {
+          month: 'short',
+          day: 'numeric',
+          weekday: 'short'
+        })
+        return `${date} ${product.start_time}〜${product.end_time}`
+      }
     }
     
     if (product.type === 'fixed' && product.available_from && product.available_until) {
@@ -165,12 +197,12 @@ export function CallPlanCard({ product, onUpdate }: CallPlanCardProps) {
                 編集
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={handleDelete}
+                onClick={handleCancel}
                 className="text-destructive focus:text-destructive"
                 disabled={isLoading}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                削除
+                キャンセル
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

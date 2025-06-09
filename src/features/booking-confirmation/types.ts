@@ -33,6 +33,8 @@ export interface BookingData {
   }
   amount: number
   status: string
+  planId?: string
+  isPlanActive?: boolean
 }
 
 export interface CheckoutParams {

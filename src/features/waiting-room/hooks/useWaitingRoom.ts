@@ -41,8 +41,32 @@ export function useWaitingRoom(planId: string) {
         return
       }
       
-      const newStatus = result.status!
-      setStatus(newStatus)
+      const newStatus: WaitingRoomStatus = {
+        queue: result.participants || [],
+        current_call: result.currentCall ? {
+          id: result.currentCall.id,
+          participant: result.currentParticipant,
+          started_at: result.currentCall.started_at,
+          ends_at: result.currentCall.ends_at
+        } : null,
+        creator_status: result.creatorStatus || 'waiting',
+        plan: result.plan
+      }
+      console.log('[useWaitingRoom] Status fetched:', {
+        queueLength: newStatus.queue?.length || 0,
+        currentCall: !!newStatus.current_call,
+        creatorStatus: newStatus.creator_status,
+        plan: newStatus.plan
+      })
+      
+      // 更新前の状態を保存
+      setStatus(prevStatus => {
+        // 現在の通話が終了した場合、UIを即座に更新
+        if (prevStatus?.current_call && !newStatus.current_call) {
+          console.log('[useWaitingRoom] Current call ended, updating UI')
+        }
+        return newStatus
+      })
       setLoading(false)
     } catch (error) {
       console.error('Error fetching waiting room status:', error)
@@ -58,7 +82,7 @@ export function useWaitingRoom(planId: string) {
 
   // 定期的にデータを更新
   useEffect(() => {
-    refreshInterval.current = setInterval(fetchStatus, 5000) // 5秒ごと
+    refreshInterval.current = setInterval(fetchStatus, 3000) // 3秒ごと
     return () => {
       if (refreshInterval.current) {
         clearInterval(refreshInterval.current)
@@ -96,7 +120,30 @@ export function useWaitingRoom(planId: string) {
         toast.error(result.error)
       } else {
         toast.success('通話を終了しました')
+        
+        // 通話終了後、UIをすぐに更新
+        setStatus(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            current_call: null,
+            creator_status: 'waiting'
+          }
+        })
+        
+        // 次の参加者がいる場合の通知
+        if (result.hasMoreParticipants) {
+          toast.info('次の参加者が待機しています')
+        }
+        
+        // 即座に最新データを取得
+        console.log('[useWaitingRoom] Fetching status after call end...')
+        // 最初の取得は即座に
         fetchStatus()
+        // 念のため少し遅延してからも取得
+        setTimeout(() => {
+          fetchStatus()
+        }, 1500)
       }
     } catch (error) {
       console.error('Error ending call:', error)

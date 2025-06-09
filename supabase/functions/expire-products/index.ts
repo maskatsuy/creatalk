@@ -63,7 +63,7 @@ serve(async (req) => {
     let queueFilter = supabase
       .from('call_products')
       .update({ 
-        status: 'expired',
+        status: 'completed',
         updated_at: currentDateTime
       })
       .eq('type', 'queue')
@@ -90,7 +90,7 @@ serve(async (req) => {
     let fixedFilter = supabase
       .from('call_products')
       .update({ 
-        status: 'expired',
+        status: 'completed',
         updated_at: currentDateTime
       })
       .eq('type', 'fixed')
@@ -118,7 +118,7 @@ serve(async (req) => {
     let todayFilter = supabase
       .from('call_products')
       .update({ 
-        status: 'expired',
+        status: 'completed',
         updated_at: currentDateTime
       })
       .eq('type', 'queue')

@@ -15,6 +15,9 @@ export interface CallProduct {
   type: string
   slot_date: string | null
   start_time: string | null
+  end_time?: string | null
+  start_at?: string | null
+  end_at?: string | null
   price: number
   creator_id: string
 }
@@ -36,11 +39,12 @@ export interface CallBooking {
 export interface UserBooking {
   id: string
   type: 'queue' | 'fixed'
-  status: 'waiting' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'waiting' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'in_call'
   createdAt: string
   // Queue specific
   queuePosition?: number
   planId?: string
+  isPlanActive?: boolean  // Whether the queue plan is currently in its scheduled time
   // Fixed booking specific
   bookingDate?: string
   startTime?: string
@@ -62,5 +66,5 @@ export interface UserBooking {
   amount: number
 }
 
-export type BookingFilter = 'all' | 'upcoming' | 'completed'
+export type BookingFilter = 'all' | 'active' | 'completed' | 'cancelled'
 
