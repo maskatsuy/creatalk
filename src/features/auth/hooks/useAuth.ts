@@ -154,7 +154,7 @@ export const useAuth = (initialUser: User | null = null) => {
         throw error
       }
     }
-  }, [supabase.auth, supabase])
+  }, [supabase])
 
   const signOut = useCallback(async () => {
     try {
